@@ -247,7 +247,8 @@ const STOPWORDS = new Set([
   'nahi','kya','to','me','my','your','are','was','be','but','so','just','not','de','do','media','omitted',
   'voice','deleted','message','tum','tu','have','rhi','hum','ok','get','we','nahi','aur','nhi',
   'mein','don','can','tho','will','mujhe','tumhe','waha','kuch','kya','hogi','kar','liye',
-  'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera',
+  'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera', "http", 
+  "link","https", 
 ]);
 
 export function getWordCloudData(messages, topN = 40) {
@@ -593,7 +594,9 @@ export function getMilestoneStats(messages, senders) {
 }
 
 // 3. Love Word Tracker
-export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby", "babe", "cutie", "❤️", "😘"];
+export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby", "babe", "cutie", "❤️", "😘", "darling", "shona", "bae", "miss uh",
+  "sweetheart", "ily", "bubu", "babe", "dudu", "cutie", "jaanu"
+];
 
 export function getLoveWordStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];

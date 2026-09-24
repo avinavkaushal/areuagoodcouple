@@ -12,8 +12,8 @@ function KeywordSearch({ messages }) {
   const workerRef = useRef(null);
   const searchIdRef = useRef(0);
 
-  const firstDate = messages?.[0]?.date;
-  const lastDate = messages?.[messages?.length - 1]?.date;
+  const firstDate = messages?.[0]?.timestamp || messages?.[0]?.date;
+  const lastDate = messages?.[messages?.length - 1]?.timestamp || messages?.[messages?.length - 1]?.date;
   const firstTime = firstDate ? new Date(firstDate).getTime() : 0;
   const lastTime = lastDate ? new Date(lastDate).getTime() : 0;
   const span = lastTime - firstTime;
@@ -26,11 +26,15 @@ function KeywordSearch({ messages }) {
       const worker = new Worker(new URL('../lib/searchWorker.js', import.meta.url), { type: 'module' });
       workerRef.current = worker;
 
-      const initPayload = messages.map(m => ({
-        text: m.text,
-        date: m.date instanceof Date ? m.date.getTime() : m.date,
-        sender: m.sender,
-      }));
+      const initPayload = messages.map(m => {
+        const d = m.timestamp || m.date;
+        return {
+          text: m.text,
+          date: d instanceof Date ? d.getTime() : d,
+          sender: m.sender,
+          type: m.type,
+        };
+      });
       worker.postMessage({ type: 'INIT', payload: initPayload });
 
       worker.onmessage = (e) => {
@@ -118,13 +122,6 @@ function KeywordSearch({ messages }) {
 
   return (
     <section id="search" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[24vw] sm:text-[18vw] leading-none font-semibold"
-      >
-        ?
-      </div>
-
       <div className="relative z-10">
         <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">a word, counted</p>
 

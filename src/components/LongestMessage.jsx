@@ -14,13 +14,6 @@ function LongestMessage({ messages, senders }) {
 
   return (
     <section id="longest-message" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-navy">
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[26vw] sm:text-[20vw] leading-none font-semibold"
-      >
-        ”
-      </div>
-
       <div className="relative z-10 max-w-2xl">
         <p className="font-sans text-blush/70 text-sm mb-4 sm:mb-8">the longest monologue</p>
 

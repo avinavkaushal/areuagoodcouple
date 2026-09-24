@@ -1,4 +1,4 @@
-const EMOJI_RE = /(\p{Extended_Pictographic})/gu;
+const EMOJI_RE = /(\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)/gu;
 
 export function formatDuration(firstDate, lastDate) {
   if (!firstDate || !lastDate) return 'our time';
@@ -30,10 +30,20 @@ export function formatSinceDate(firstDate) {
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
+function getNonSystemMessages(messages) {
+  return (messages || []).filter((m) => m && m.type !== 'system');
+}
+
+function getMsgDate(m) {
+  return m ? (m.timestamp instanceof Date ? m.timestamp : (m.date instanceof Date ? m.date : new Date(m.timestamp || m.date || 0))) : new Date();
+}
+
 export function getEmojiStats(messages) {
   const counts = {}; // { sender: { emoji: count } }
-  for (const m of (messages || [])) {
-    const emojis = m.text.match(EMOJI_RE) || [];
+  const validMessages = getNonSystemMessages(messages);
+
+  for (const m of validMessages) {
+    const emojis = (m.text || '').match(EMOJI_RE) || [];
     if (!counts[m.sender]) counts[m.sender] = {};
     for (const e of emojis) {
       counts[m.sender][e] = (counts[m.sender][e] || 0) + 1;
@@ -52,9 +62,10 @@ export function getEmojiComparison(messages, senders) {
   const order = [p1, p2];
   const bySender = { [p1]: {}, [p2]: {} };
   const total = {};
+  const validMessages = getNonSystemMessages(messages);
 
-  for (const m of (messages || [])) {
-    const emojis = m.text.match(EMOJI_RE) || [];
+  for (const m of validMessages) {
+    const emojis = (m.text || '').match(EMOJI_RE) || [];
     if (!bySender[m.sender]) continue;
     for (const e of emojis) {
       bySender[m.sender][e] = (bySender[m.sender][e] || 0) + 1;
@@ -80,19 +91,21 @@ export function getEmojiComparison(messages, senders) {
 
 export function getKeywordStats(messages, keyword) {
   const kw = (keyword || '').trim().toLowerCase();
-  if (!kw || !messages || messages.length === 0) return null;
+  const validMessages = getNonSystemMessages(messages);
+  if (!kw || validMessages.length === 0) return null;
 
   const hourCounts = new Array(24).fill(0);
   const hitTimestamps = [];
   let count = 0;
 
-  for (let i = 0; i < messages.length; i++) {
-    const m = messages[i];
-    if (m.text.toLowerCase().includes(kw)) {
+  for (let i = 0; i < validMessages.length; i++) {
+    const m = validMessages[i];
+    if ((m.text || '').toLowerCase().includes(kw)) {
       count++;
-      const h = m.date.getHours();
+      const d = getMsgDate(m);
+      const h = d.getHours();
       hourCounts[h]++;
-      hitTimestamps.push(m.date.getTime());
+      hitTimestamps.push(d.getTime());
     }
   }
 
@@ -134,8 +147,11 @@ export function getKeywordStats(messages, keyword) {
 export function getHeatmapData(messages) {
   // grid[day][hour] = count, day 0=Sun..6=Sat
   const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-  (messages || []).forEach(m => {
-    grid[m.date.getDay()][m.date.getHours()]++;
+  const validMessages = getNonSystemMessages(messages);
+
+  validMessages.forEach((m) => {
+    const d = getMsgDate(m);
+    grid[d.getDay()][d.getHours()]++;
   });
   return grid;
 }
@@ -144,14 +160,16 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 
 // Reusable streak helper: longest run of consecutive calendar days where matchFn(m) is true
 export function getLongestStreak(messages, matchFn) {
-  if (!messages || messages.length === 0) return 0;
+  const validMessages = getNonSystemMessages(messages);
+  if (validMessages.length === 0) return 0;
   const dayTimestamps = new Set();
 
-  for (let i = 0; i < messages.length; i++) {
-    const m = messages[i];
+  for (let i = 0; i < validMessages.length; i++) {
+    const m = validMessages[i];
     if (!matchFn || matchFn(m)) {
-      const d = new Date(m.date.getFullYear(), m.date.getMonth(), m.date.getDate()).getTime();
-      dayTimestamps.add(d);
+      const d = getMsgDate(m);
+      const dayTs = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+      dayTimestamps.add(dayTs);
     }
   }
 
@@ -175,7 +193,8 @@ export function getLongestStreak(messages, matchFn) {
 }
 
 export function getHighlights(messages) {
-  if (!messages || messages.length === 0) {
+  const validMessages = getNonSystemMessages(messages);
+  if (validMessages.length === 0) {
     return {
       busiestDay: null,
       busiestMonth: null,
@@ -186,9 +205,10 @@ export function getHighlights(messages) {
 
   const dayCounts = {};
   const monthCounts = {};
-  messages.forEach(m => {
-    const dKey = m.date.toDateString();
-    const mKey = `${m.date.getFullYear()}-${m.date.getMonth()}`;
+  validMessages.forEach((m) => {
+    const d = getMsgDate(m);
+    const dKey = d.toDateString();
+    const mKey = `${d.getFullYear()}-${d.getMonth()}`;
     dayCounts[dKey] = (dayCounts[dKey] || 0) + 1;
     monthCounts[mKey] = (monthCounts[mKey] || 0) + 1;
   });
@@ -196,8 +216,8 @@ export function getHighlights(messages) {
   const busiestDayEntry = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0];
   const busiestMonthEntry = Object.entries(monthCounts).sort((a, b) => b[1] - a[1])[0];
 
-  const uniqueDaysSorted = [...new Set(messages.map(m => m.date.toDateString()))]
-    .map(d => new Date(d))
+  const uniqueDaysSorted = [...new Set(validMessages.map((m) => getMsgDate(m).toDateString()))]
+    .map((d) => new Date(d))
     .sort((a, b) => a - b);
 
   let longestGapDays = 0;
@@ -206,7 +226,7 @@ export function getHighlights(messages) {
     longestGapDays = Math.max(longestGapDays, diff);
   }
 
-  const longestStreak = getLongestStreak(messages);
+  const longestStreak = getLongestStreak(validMessages);
   const [year, month] = busiestMonthEntry ? busiestMonthEntry[0].split('-').map(Number) : [null, null];
 
   return {
@@ -232,9 +252,11 @@ const STOPWORDS = new Set([
 
 export function getWordCloudData(messages, topN = 40) {
   const counts = {};
-  (messages || []).forEach(m => {
-    const words = m.text.toLowerCase().match(/[a-z\p{sc=Devanagari}]+/gu) || [];
-    words.forEach(w => {
+  const validMessages = getNonSystemMessages(messages);
+
+  validMessages.forEach((m) => {
+    const words = (m.text || '').toLowerCase().match(/[a-z\p{sc=Devanagari}]+/gu) || [];
+    words.forEach((w) => {
       if (w.length < 3 || STOPWORDS.has(w)) return;
       counts[w] = (counts[w] || 0) + 1;
     });
@@ -247,8 +269,11 @@ export function getMediaStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   let count1 = 0;
   let count2 = 0;
-  (messages || []).forEach(m => {
-    if (m.text.includes('<Media omitted>') || m.text.includes('omitted>')) {
+  const validMessages = getNonSystemMessages(messages);
+
+  validMessages.forEach((m) => {
+    const isMedia = m.type === 'media' || m.type === 'sticker' || (m.text && (m.text.includes('<Media omitted>') || m.text.includes('omitted>')));
+    if (isMedia) {
       if (m.sender === p1) count1++;
       else if (m.sender === p2) count2++;
     }
@@ -258,15 +283,16 @@ export function getMediaStats(messages, senders) {
 }
 
 export function getOverviewStats(messages) {
-  if (!messages || messages.length === 0) {
+  const validMessages = getNonSystemMessages(messages);
+  if (validMessages.length === 0) {
     return { totalMessages: 0, totalWords: 0, uniqueDays: 0, totalMedia: 0, firstDate: null, lastDate: null };
   }
-  const totalMessages = messages.length;
-  const totalWords = messages.reduce((sum, m) => sum + m.text.trim().split(/\s+/).filter(Boolean).length, 0);
-  const uniqueDays = new Set(messages.map(m => m.date.toDateString())).size;
-  const totalMedia = messages.filter(m => m.text.includes('<Media omitted>') || m.text.includes('omitted>')).length;
-  const firstDate = messages[0]?.date;
-  const lastDate = messages[messages.length - 1]?.date;
+  const totalMessages = validMessages.length;
+  const totalWords = validMessages.reduce((sum, m) => sum + (m.text || '').trim().split(/\s+/).filter(Boolean).length, 0);
+  const uniqueDays = new Set(validMessages.map((m) => getMsgDate(m).toDateString())).size;
+  const totalMedia = validMessages.filter((m) => m.type === 'media' || m.type === 'sticker' || (m.text && (m.text.includes('<Media omitted>') || m.text.includes('omitted>')))).length;
+  const firstDate = getMsgDate(validMessages[0]);
+  const lastDate = getMsgDate(validMessages[validMessages.length - 1]);
   return { totalMessages, totalWords, uniqueDays, totalMedia, firstDate, lastDate };
 }
 
@@ -284,13 +310,15 @@ export function getPeakSlot(grid) {
 }
 
 export function getCalendarHeat(messages) {
-  if (!messages || messages.length === 0) return [];
-  const firstDate = messages[0].date;
-  const lastDate = messages[messages.length - 1].date;
+  const validMessages = getNonSystemMessages(messages);
+  if (validMessages.length === 0) return [];
+  const firstDate = getMsgDate(validMessages[0]);
+  const lastDate = getMsgDate(validMessages[validMessages.length - 1]);
 
   const countsByDay = {};
-  messages.forEach(m => {
-    const key = `${m.date.getFullYear()}-${String(m.date.getMonth() + 1).padStart(2, '0')}-${String(m.date.getDate()).padStart(2, '0')}`;
+  validMessages.forEach((m) => {
+    const d = getMsgDate(m);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     countsByDay[key] = (countsByDay[key] || 0) + 1;
   });
 
@@ -313,8 +341,11 @@ export function getCalendarHeat(messages) {
 export function getInitiatorStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const firstMsgByDay = {}; // { YYYY-MM-DD: sender }
-  (messages || []).forEach(m => {
-    const key = `${m.date.getFullYear()}-${String(m.date.getMonth() + 1).padStart(2, '0')}-${String(m.date.getDate()).padStart(2, '0')}`;
+  const validMessages = getNonSystemMessages(messages);
+
+  validMessages.forEach((m) => {
+    const d = getMsgDate(m);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     if (!firstMsgByDay[key]) {
       firstMsgByDay[key] = m.sender;
     }
@@ -322,7 +353,7 @@ export function getInitiatorStats(messages, senders) {
 
   let count1 = 0;
   let count2 = 0;
-  Object.values(firstMsgByDay).forEach(sender => {
+  Object.values(firstMsgByDay).forEach((sender) => {
     if (sender === p1) count1++;
     else if (sender === p2) count2++;
   });
@@ -339,15 +370,16 @@ export function getInitiatorStats(messages, senders) {
 
 export function getLongestMessage(messages, senders) {
   const defaultSender = senders && senders[0] ? senders[0] : 'unknown';
-  if (!messages || messages.length === 0) {
+  const validMessages = getNonSystemMessages(messages).filter((m) => m.type !== 'media' && m.type !== 'sticker');
+  if (validMessages.length === 0) {
     return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
 
   let best = null;
   let maxWords = -1;
 
-  messages.forEach(m => {
-    const words = m.text.trim().split(/\s+/).filter(Boolean).length;
+  validMessages.forEach((m) => {
+    const words = (m.text || '').trim().split(/\s+/).filter(Boolean).length;
     if (words > maxWords) {
       maxWords = words;
       best = m;
@@ -358,14 +390,14 @@ export function getLongestMessage(messages, senders) {
     return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
 
-  const rawText = best.text.trim();
+  const rawText = (best.text || '').trim();
   const truncatedText = rawText.length > 200 ? rawText.slice(0, 200).trim() + '…' : rawText;
 
   return {
     text: truncatedText,
     wordCount: maxWords,
     sender: best.sender,
-    date: best.date,
+    date: getMsgDate(best),
   };
 }
 
@@ -375,9 +407,11 @@ export function getLateNightStats(messages, senders) {
   let count2Total = 0;
   let count1Late = 0;
   let count2Late = 0;
+  const validMessages = getNonSystemMessages(messages);
 
-  (messages || []).forEach(m => {
-    const h = m.date.getHours();
+  validMessages.forEach((m) => {
+    const d = getMsgDate(m);
+    const h = d.getHours();
     const isLate = h >= 0 && h < 4;
     if (m.sender === p1) {
       count1Total++;
@@ -403,9 +437,10 @@ export function getVerbosityStats(messages, senders) {
   let msgs1 = 0;
   let words2 = 0;
   let msgs2 = 0;
+  const validMessages = getNonSystemMessages(messages).filter((m) => m.type !== 'media' && m.type !== 'sticker');
 
-  (messages || []).forEach(m => {
-    const words = m.text.trim().split(/\s+/).filter(Boolean).length;
+  validMessages.forEach((m) => {
+    const words = (m.text || '').trim().split(/\s+/).filter(Boolean).length;
     if (m.sender === p1) {
       words1 += words;
       msgs1++;
@@ -452,22 +487,25 @@ export function getResponseTimeStats(messages, senders) {
   };
 
   const MAX_REPLY_GAP = 12 * 60 * 60 * 1000; // 12 hours
+  const validMessages = getNonSystemMessages(messages);
 
-  if (messages && messages.length > 1) {
-    for (let i = 1; i < messages.length; i++) {
-      const prev = messages[i - 1];
-      const curr = messages[i];
+  if (validMessages.length > 1) {
+    for (let i = 1; i < validMessages.length; i++) {
+      const prev = validMessages[i - 1];
+      const curr = validMessages[i];
       if (curr.sender !== prev.sender) {
         const replier = curr.sender;
         if (data[replier]) {
-          const gapMs = Math.max(0, curr.date.getTime() - prev.date.getTime());
+          const currTime = getMsgDate(curr).getTime();
+          const prevTime = getMsgDate(prev).getTime();
+          const gapMs = Math.max(0, currTime - prevTime);
           if (gapMs <= MAX_REPLY_GAP) {
             data[replier].sumMs += gapMs;
             data[replier].count++;
           }
           if (gapMs > data[replier].longestGapMs) {
             data[replier].longestGapMs = gapMs;
-            data[replier].longestGapDate = curr.date;
+            data[replier].longestGapDate = getMsgDate(curr);
           }
         }
       }
@@ -504,28 +542,27 @@ export function getResponseTimeStats(messages, senders) {
 // 2. Milestone Counter
 export function getMilestoneStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
-  const totalMessages = messages?.length || 0;
+  const validMessages = getNonSystemMessages(messages);
+  const totalMessages = validMessages.length;
   let totalWords = 0;
   const msgsBySender = { [p1]: 0, [p2]: 0 };
   const wordsBySender = { [p1]: 0, [p2]: 0 };
   const dayCounts = {};
 
-  if (messages) {
-    for (let i = 0; i < messages.length; i++) {
-      const m = messages[i];
-      const words = m.text.trim().split(/\s+/).filter(Boolean).length;
-      totalWords += words;
-      if (msgsBySender[m.sender] !== undefined) {
-        msgsBySender[m.sender]++;
-        wordsBySender[m.sender] += words;
-      }
-      const dKey = m.date.toDateString();
-      dayCounts[dKey] = (dayCounts[dKey] || 0) + 1;
+  for (let i = 0; i < validMessages.length; i++) {
+    const m = validMessages[i];
+    const words = (m.text || '').trim().split(/\s+/).filter(Boolean).length;
+    totalWords += words;
+    if (msgsBySender[m.sender] !== undefined) {
+      msgsBySender[m.sender]++;
+      wordsBySender[m.sender] += words;
     }
+    const dKey = getMsgDate(m).toDateString();
+    dayCounts[dKey] = (dayCounts[dKey] || 0) + 1;
   }
 
-  const firstDate = messages?.[0]?.date;
-  const lastDate = messages?.[messages?.length - 1]?.date;
+  const firstDate = validMessages[0] ? getMsgDate(validMessages[0]) : null;
+  const lastDate = validMessages[validMessages.length - 1] ? getMsgDate(validMessages[validMessages.length - 1]) : null;
   const daySpan = firstDate && lastDate
     ? Math.max(1, Math.round((new Date(lastDate) - new Date(firstDate)) / (1000 * 60 * 60 * 24)))
     : 1;
@@ -540,7 +577,7 @@ export function getMilestoneStats(messages, senders) {
       }
     : null;
 
-  const longestDailyStreak = getLongestStreak(messages);
+  const longestDailyStreak = getLongestStreak(validMessages);
 
   return {
     totalMessages,
@@ -561,46 +598,46 @@ export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby"
 export function getLoveWordStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const wordCounts = {};
-  LOVE_WORDS.forEach(w => {
+  LOVE_WORDS.forEach((w) => {
     wordCounts[w] = { [p1]: 0, [p2]: 0, total: 0 };
   });
 
   const totals = { [p1]: 0, [p2]: 0, overall: 0 };
   const monthlyCounts = {};
+  const validMessages = getNonSystemMessages(messages);
 
-  if (messages) {
-    for (let i = 0; i < messages.length; i++) {
-      const m = messages[i];
-      const textLower = m.text.toLowerCase();
-      let matchedAnyInMsg = false;
+  for (let i = 0; i < validMessages.length; i++) {
+    const m = validMessages[i];
+    const textLower = (m.text || '').toLowerCase();
+    let matchedAnyInMsg = false;
 
-      for (let j = 0; j < LOVE_WORDS.length; j++) {
-        const lw = LOVE_WORDS[j];
-        const lwLower = lw.toLowerCase();
-        let pos = 0;
-        let count = 0;
-        while ((pos = textLower.indexOf(lwLower, pos)) !== -1) {
-          count++;
-          pos += lwLower.length;
-        }
-
-        if (count > 0) {
-          matchedAnyInMsg = true;
-          if (wordCounts[lw][m.sender] !== undefined) {
-            wordCounts[lw][m.sender] += count;
-          }
-          wordCounts[lw].total += count;
-          if (totals[m.sender] !== undefined) {
-            totals[m.sender] += count;
-          }
-          totals.overall += count;
-        }
+    for (let j = 0; j < LOVE_WORDS.length; j++) {
+      const lw = LOVE_WORDS[j];
+      const lwLower = lw.toLowerCase();
+      let pos = 0;
+      let count = 0;
+      while ((pos = textLower.indexOf(lwLower, pos)) !== -1) {
+        count++;
+        pos += lwLower.length;
       }
 
-      if (matchedAnyInMsg) {
-        const mKey = `${m.date.getFullYear()}-${String(m.date.getMonth() + 1).padStart(2, '0')}`;
-        monthlyCounts[mKey] = (monthlyCounts[mKey] || 0) + 1;
+      if (count > 0) {
+        matchedAnyInMsg = true;
+        if (wordCounts[lw][m.sender] !== undefined) {
+          wordCounts[lw][m.sender] += count;
+        }
+        wordCounts[lw].total += count;
+        if (totals[m.sender] !== undefined) {
+          totals[m.sender] += count;
+        }
+        totals.overall += count;
       }
+    }
+
+    if (matchedAnyInMsg) {
+      const d = getMsgDate(m);
+      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      monthlyCounts[mKey] = (monthlyCounts[mKey] || 0) + 1;
     }
   }
 
@@ -611,7 +648,7 @@ export function getLoveWordStats(messages, senders) {
       [p1]: counts[p1],
       [p2]: counts[p2],
     }))
-    .filter(item => item.total > 0)
+    .filter((item) => item.total > 0)
     .sort((a, b) => b.total - a.total);
 
   const topWord = leaderboard[0] || null;
@@ -645,12 +682,15 @@ export function getLoveWordStats(messages, senders) {
 
 // 4. Random Memory Picker
 export function getRandomMemory(messages) {
-  if (!messages || messages.length === 0) return null;
+  const validMessages = getNonSystemMessages(messages);
+  if (validMessages.length === 0) return null;
 
   const candidates = [];
-  for (let i = 0; i < messages.length; i++) {
-    const t = messages[i].text.trim();
-    if (t.length > 5 && !t.includes('<Media omitted>') && !t.includes('omitted>')) {
+  for (let i = 0; i < validMessages.length; i++) {
+    const m = validMessages[i];
+    const t = (m.text || '').trim();
+    const isMedia = m.type === 'media' || m.type === 'sticker' || t.includes('<Media omitted>') || t.includes('omitted>');
+    if (t.length > 5 && !isMedia) {
       candidates.push(i);
     }
   }
@@ -658,37 +698,36 @@ export function getRandomMemory(messages) {
   if (candidates.length === 0) return null;
 
   const randIdx = candidates[Math.floor(Math.random() * candidates.length)];
-  const primaryMsg = messages[randIdx];
+  const primaryMsg = validMessages[randIdx];
+  const primaryDate = getMsgDate(primaryMsg);
 
   const windowMsgs = [primaryMsg];
   if (randIdx > 0) {
-    const prev = messages[randIdx - 1];
-    if (
-      !prev.text.includes('omitted>') &&
-      Math.abs(primaryMsg.date.getTime() - prev.date.getTime()) < 15 * 60 * 1000
-    ) {
+    const prev = validMessages[randIdx - 1];
+    const prevDate = getMsgDate(prev);
+    const prevIsMedia = prev.type === 'media' || prev.type === 'sticker' || (prev.text && prev.text.includes('omitted>'));
+    if (!prevIsMedia && Math.abs(primaryDate.getTime() - prevDate.getTime()) < 15 * 60 * 1000) {
       windowMsgs.unshift(prev);
     }
   }
-  if (randIdx < messages.length - 1 && windowMsgs.length < 3) {
-    const next = messages[randIdx + 1];
-    if (
-      !next.text.includes('omitted>') &&
-      Math.abs(next.date.getTime() - primaryMsg.date.getTime()) < 15 * 60 * 1000
-    ) {
+  if (randIdx < validMessages.length - 1 && windowMsgs.length < 3) {
+    const next = validMessages[randIdx + 1];
+    const nextDate = getMsgDate(next);
+    const nextIsMedia = next.type === 'media' || next.type === 'sticker' || (next.text && next.text.includes('omitted>'));
+    if (!nextIsMedia && Math.abs(nextDate.getTime() - primaryDate.getTime()) < 15 * 60 * 1000) {
       windowMsgs.push(next);
     }
   }
 
   return {
     id: `${randIdx}-${Date.now()}-${Math.random()}`,
-    date: primaryMsg.date.toLocaleDateString('en-US', {
+    date: primaryDate.toLocaleDateString('en-US', {
       weekday: 'short',
       month: 'short',
       day: 'numeric',
       year: 'numeric',
     }),
-    time: primaryMsg.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    time: primaryDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
     messages: windowMsgs,
     primarySender: primaryMsg.sender,
   };
@@ -699,7 +738,7 @@ export const MORNING_PHRASES = ["good morning", "gm", "morning!"];
 export const NIGHT_PHRASES = ["good night", "gn", "night night", "nite"];
 
 function matchesAnyPhrase(text, phrases) {
-  const lower = text.toLowerCase();
+  const lower = (text || '').toLowerCase();
   for (let i = 0; i < phrases.length; i++) {
     if (lower.includes(phrases[i])) return true;
   }
@@ -710,26 +749,25 @@ export function getCalloutStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const morningCounts = { [p1]: 0, [p2]: 0, total: 0 };
   const nightCounts = { [p1]: 0, [p2]: 0, total: 0 };
+  const validMessages = getNonSystemMessages(messages);
 
-  if (messages) {
-    for (let i = 0; i < messages.length; i++) {
-      const m = messages[i];
-      if (matchesAnyPhrase(m.text, MORNING_PHRASES)) {
-        if (morningCounts[m.sender] !== undefined) morningCounts[m.sender]++;
-        morningCounts.total++;
-      }
-      if (matchesAnyPhrase(m.text, NIGHT_PHRASES)) {
-        if (nightCounts[m.sender] !== undefined) nightCounts[m.sender]++;
-        nightCounts.total++;
-      }
+  for (let i = 0; i < validMessages.length; i++) {
+    const m = validMessages[i];
+    if (matchesAnyPhrase(m.text, MORNING_PHRASES)) {
+      if (morningCounts[m.sender] !== undefined) morningCounts[m.sender]++;
+      morningCounts.total++;
+    }
+    if (matchesAnyPhrase(m.text, NIGHT_PHRASES)) {
+      if (nightCounts[m.sender] !== undefined) nightCounts[m.sender]++;
+      nightCounts.total++;
     }
   }
 
   const morningLeader = morningCounts[p1] >= morningCounts[p2] ? p1 : p2;
   const nightLeader = nightCounts[p1] >= nightCounts[p2] ? p1 : p2;
 
-  const longestMorningStreak = getLongestStreak(messages, m => matchesAnyPhrase(m.text, MORNING_PHRASES));
-  const longestNightStreak = getLongestStreak(messages, m => matchesAnyPhrase(m.text, NIGHT_PHRASES));
+  const longestMorningStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, MORNING_PHRASES));
+  const longestNightStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, NIGHT_PHRASES));
 
   return {
     senders: [p1, p2],

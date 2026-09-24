@@ -8,7 +8,6 @@ import heroPoster from '../assets/hero-bg-poster.jpg';
 function Hero({ messages, senders }) {
   const lettersRef = useRef(null);
   const subRef = useRef(null);
-  const heartRef = useRef(null);
   const videoRef = useRef(null);
 
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
@@ -21,8 +20,8 @@ function Hero({ messages, senders }) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const word = `${p1}${p2}`;
 
-  const firstDate = messages?.[0]?.date;
-  const lastDate = messages?.[messages?.length - 1]?.date;
+  const firstDate = messages?.[0]?.timestamp || messages?.[0]?.date;
+  const lastDate = messages?.[messages?.length - 1]?.timestamp || messages?.[messages?.length - 1]?.date;
   const duration = formatDuration(firstDate, lastDate);
   const sinceDate = formatSinceDate(firstDate);
 
@@ -74,8 +73,7 @@ function Hero({ messages, senders }) {
         duration: 0.9,
         stagger: 0.05,
       })
-        .from(subRef.current, { opacity: 0, y: 10, duration: 0.6 }, '-=0.3')
-        .from(heartRef.current, { opacity: 0, scale: 0, duration: 0.5, ease: 'back.out(2)' }, '-=0.2');
+        .from(subRef.current, { opacity: 0, y: 10, duration: 0.6 }, '-=0.3');
     });
 
     return () => ctx.revert();
@@ -115,14 +113,6 @@ function Hero({ messages, senders }) {
         className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/35 to-transparent pointer-events-none z-[1]"
       />
 
-      {/* Decorative ambient watermark heart */}
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-pink/[0.04] text-[22vw] sm:text-[18vw] leading-none font-semibold z-0"
-      >
-        ♥
-      </div>
-
       {/* Hero content */}
       <div className="max-w-3xl relative z-10">
         <h1
@@ -134,14 +124,7 @@ function Hero({ messages, senders }) {
           ))}
         </h1>
 
-        <div className="flex items-center gap-3 mt-6 sm:mt-8">
-          <svg ref={heartRef} width="22" height="20" viewBox="0 0 22 20" fill="none">
-            <path
-              d="M11 19C11 19 1 12.5 1 6.5C1 3 3.5 1 6.5 1C8.5 1 10 2 11 3.5C12 2 13.5 1 15.5 1C18.5 1 21 3 21 6.5C21 12.5 11 19 11 19Z"
-              stroke="#FF85BB"
-              strokeWidth="1.5"
-            />
-          </svg>
+        <div className="mt-6 sm:mt-8">
           <p ref={subRef} className="font-sans text-cloud/85 text-sm sm:text-base tracking-tight font-medium drop-shadow-sm">
             {duration}, one chat{sinceDate ? `, since ${sinceDate}` : ''}
           </p>

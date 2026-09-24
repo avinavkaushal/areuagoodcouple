@@ -42,14 +42,23 @@ Your messages never leave your device.
 
 ---
 
-## 📱 How to Export Your WhatsApp Chat
+## 📱 How to Export Your Chat
 
+### WhatsApp (.txt)
 1. Open WhatsApp on your phone (iOS or Android).
 2. Open the 1-on-1 chat you want to analyze.
 3. Tap **More (⋮)** (or the contact's name at the top on iOS).
 4. Tap **Export Chat**.
 5. Select **Without Media** *(important — this creates a lightweight `.txt` export)*.
 6. Open **[areuagoodcouple.vercel.app](https://areuagoodcouple.vercel.app)** and drop the `.txt` file onto the upload zone!
+
+### Telegram (.json)
+1. Open Telegram Desktop on your computer.
+2. Open the 1-on-1 chat you want to analyze.
+3. Click the top-right menu **(⋮)** &rarr; **Export chat history**.
+4. Set the format to **Machine-readable JSON** (uncheck media for a fast export).
+5. Export and drop the resulting `result.json` onto the upload zone!
+6. Confirm the detected platform and map participant names to Her & Him.
 
 ---
 

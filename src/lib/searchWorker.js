@@ -4,19 +4,25 @@ self.onmessage = (e) => {
   const { type, payload } = e.data;
 
   if (type === 'INIT') {
-    // Pre-cache messages with lowercase text and precalculated timestamp/hour
-    messagesData = (payload || []).map((m) => {
-      const ts = typeof m.date === 'string' || typeof m.date === 'number'
-        ? new Date(m.date).getTime()
-        : (m.date instanceof Date ? m.date.getTime() : 0);
-      const hour = new Date(ts).getHours();
-      return {
-        textLower: (m.text || '').toLowerCase(),
-        ts,
-        hour,
-        sender: m.sender,
-      };
-    });
+    // Pre-cache messages with lowercase text and precalculated timestamp/hour, ignoring system messages
+    messagesData = (payload || [])
+      .filter((m) => m && m.type !== 'system')
+      .map((m) => {
+        const rawDate = m.timestamp || m.date;
+        const ts =
+          typeof rawDate === 'string' || typeof rawDate === 'number'
+            ? new Date(rawDate).getTime()
+            : rawDate instanceof Date
+            ? rawDate.getTime()
+            : 0;
+        const hour = new Date(ts).getHours();
+        return {
+          textLower: (m.text || '').toLowerCase(),
+          ts,
+          hour,
+          sender: m.sender,
+        };
+      });
     self.postMessage({ type: 'INIT_DONE' });
   } else if (type === 'SEARCH') {
     const { searchId, keyword } = payload;

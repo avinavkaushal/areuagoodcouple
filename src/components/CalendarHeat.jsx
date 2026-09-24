@@ -9,7 +9,9 @@ function CalendarHeat({ messages }) {
 
   const duration = useMemo(() => {
     if (!messages || messages.length === 0) return 'all time';
-    return formatDuration(messages[0]?.date, messages[messages.length - 1]?.date);
+    const first = messages[0]?.timestamp || messages[0]?.date;
+    const last = messages[messages.length - 1]?.timestamp || messages[messages.length - 1]?.date;
+    return formatDuration(first, last);
   }, [messages]);
 
   // GitHub-style grid alignment: pad initial days of the first week so Sunday is row 0
@@ -22,13 +24,6 @@ function CalendarHeat({ messages }) {
 
   return (
     <section id="calendar" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[20vw] sm:text-[16vw] leading-none font-semibold"
-      >
-        {days.length || 365}
-      </div>
-
       <div className="relative z-10">
         <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">every single day</p>
 

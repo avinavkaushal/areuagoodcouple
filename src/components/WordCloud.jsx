@@ -18,13 +18,6 @@ function WordCloud({ messages }) {
 
   return (
     <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[26vw] sm:text-[20vw] leading-none font-semibold"
-      >
-        ”
-      </div>
-
       <div className="relative z-10">
         <p className="font-sans text-pink/80 text-sm mb-8 sm:mb-12">words we reached for most</p>
 

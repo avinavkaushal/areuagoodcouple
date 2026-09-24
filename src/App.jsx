@@ -1,5 +1,10 @@
 import { useState, useRef } from 'react';
-import { parseChat } from './lib/parseChat';
+import { parseChatFile, applyNicknameMapping } from './lib/parseChat';
+import {
+  getStoredNicknameConfig,
+  saveStoredNicknameConfig,
+  resolveSenderMapping,
+} from './lib/nicknameConfig';
 import QuickNav from './components/QuickNav';
 import Hero from './components/Hero';
 import Milestones from './components/Milestones';
@@ -17,60 +22,85 @@ import CalloutStreak from './components/CalloutStreak';
 import LongestMessage from './components/LongestMessage';
 import Outro from './components/Outro';
 import GlassButton from './components/GlassButton';
+import SettingsModal from './components/SettingsModal';
 
 function App() {
   const [messages, setMessages] = useState(null);
   const [senders, setSenders] = useState(null);
+  const [rawSenders, setRawSenders] = useState(null);
+  const [platform, setPlatform] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [isParsing, setIsParsing] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [pendingChat, setPendingChat] = useState(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
   const fileInputRef = useRef(null);
 
-  function validateAndProcessFile(file) {
+  async function validateAndProcessFile(file) {
     setErrorMessage(null);
+    setPendingChat(null);
     if (!file) return;
 
-    // Strict validation: must be a .txt file
     const fileName = file.name || '';
-    const isTxt = fileName.toLowerCase().endsWith('.txt') || file.type === 'text/plain';
+    const lowerName = fileName.toLowerCase();
+    const isSupported =
+      lowerName.endsWith('.txt') ||
+      lowerName.endsWith('.json') ||
+      file.type === 'text/plain' ||
+      file.type === 'application/json';
 
-    if (!isTxt) {
-      setErrorMessage('Invalid file format. Please upload a WhatsApp chat export (.txt file only).');
+    if (!isSupported) {
+      setErrorMessage(
+        'Invalid file format. Please upload a WhatsApp chat export (.txt) or Telegram export (.json).'
+      );
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (evt) => {
-      try {
-        const text = evt.target?.result;
-        if (typeof text !== 'string' || !text.trim()) {
-          setErrorMessage('The selected file is empty. Please choose a valid WhatsApp chat .txt export.');
-          return;
-        }
+    setIsParsing(true);
 
-        const { messages: parsed, senders: detectedSenders } = parseChat(text);
+    try {
+      const storedConfig = getStoredNicknameConfig();
+      const parsed = await parseChatFile(file, storedConfig.mapping || {});
 
-        if (!parsed || parsed.length === 0) {
-          setErrorMessage('No chat messages could be parsed. Please make sure this is an unedited WhatsApp export without media.');
-          return;
-        }
-
-        if (detectedSenders.length !== 2) {
-          setErrorMessage('This tool works with 2-person chats only.');
-          return;
-        }
-
-        setMessages(parsed);
-        setSenders(detectedSenders);
-      } catch {
-        setErrorMessage('Failed to read and parse this file. Please ensure it is a valid WhatsApp chat .txt export.');
+      if (!parsed.messages || parsed.messages.length === 0) {
+        setErrorMessage(
+          'No chat messages could be parsed. Please make sure this is a valid WhatsApp or Telegram export.'
+        );
+        setIsParsing(false);
+        return;
       }
-    };
 
-    reader.onerror = () => {
-      setErrorMessage('Error reading file. Please try selecting the file again.');
-    };
+      const detectedRawSenders = parsed.rawSenders || [];
+      if (detectedRawSenders.length !== 2) {
+        setErrorMessage(
+          `This tool works with 2-person chats only. Found ${detectedRawSenders.length} participant(s)${
+            detectedRawSenders.length > 0 ? `: ${detectedRawSenders.join(', ')}` : '.'
+          }`
+        );
+        setIsParsing(false);
+        return;
+      }
 
-    reader.readAsText(file);
+      // Resolve initial Her/Him mapping
+      const resolved = resolveSenderMapping(detectedRawSenders, storedConfig);
+
+      setPendingChat({
+        platform: parsed.platform,
+        messages: parsed.messages,
+        rawSenders: detectedRawSenders,
+        fileName: file.name,
+        her: resolved.her,
+        him: resolved.him,
+      });
+    } catch (err) {
+      setErrorMessage(
+        err?.message ||
+          'Failed to read and parse this file. Please ensure it is a valid WhatsApp or Telegram chat export.'
+      );
+    } finally {
+      setIsParsing(false);
+    }
   }
 
   function handleFileChange(e) {
@@ -102,94 +132,363 @@ function App() {
     }
   }
 
+  // Pending screen mapping change handlers
+  const handlePendingHerChange = (val) => {
+    if (!pendingChat) return;
+    let nextHim = pendingChat.him;
+    if (val === pendingChat.him && pendingChat.rawSenders.length === 2) {
+      nextHim = pendingChat.rawSenders.find((s) => s !== val) || pendingChat.him;
+    }
+    setPendingChat((prev) => ({
+      ...prev,
+      her: val,
+      him: nextHim,
+    }));
+  };
+
+  const handlePendingHimChange = (val) => {
+    if (!pendingChat) return;
+    let nextHer = pendingChat.her;
+    if (val === pendingChat.her && pendingChat.rawSenders.length === 2) {
+      nextHer = pendingChat.rawSenders.find((s) => s !== val) || pendingChat.her;
+    }
+    setPendingChat((prev) => ({
+      ...prev,
+      her: nextHer,
+      him: val,
+    }));
+  };
+
+  const handleConfirmPending = () => {
+    if (!pendingChat) return;
+
+    const mapping = {
+      [pendingChat.her]: 'Her',
+      [pendingChat.him]: 'Him',
+    };
+
+    // Save mapping to persistent config
+    const currentConfig = getStoredNicknameConfig();
+    saveStoredNicknameConfig({
+      ...currentConfig,
+      mapping: {
+        ...(currentConfig.mapping || {}),
+        ...mapping,
+      },
+    });
+
+    // Remap messages to ensure sender: 'Her' | 'Him'
+    const finalMessages = applyNicknameMapping(pendingChat.messages, mapping);
+
+    setPlatform(pendingChat.platform);
+    setRawSenders(pendingChat.rawSenders);
+    setSenders(['Her', 'Him']);
+    setMessages(finalMessages);
+    setPendingChat(null);
+  };
+
+  const handleResetChat = () => {
+    setMessages(null);
+    setSenders(null);
+    setRawSenders(null);
+    setPlatform(null);
+    setPendingChat(null);
+    setErrorMessage(null);
+  };
+
+  // Re-map messages when settings are modified inside dashboard
+  const handleSaveSettingsMapping = ({ mapping }) => {
+    saveStoredNicknameConfig({ mapping });
+    if (messages) {
+      const updatedMessages = applyNicknameMapping(messages, mapping);
+      setMessages(updatedMessages);
+      setSenders(['Her', 'Him']);
+    }
+  };
+
   if (!messages) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-night text-cloud px-6 py-12 select-none">
         <div className="w-full max-w-lg flex flex-col items-center">
-          {/* Main Drop / Upload Card */}
+          {/* Main Drop / Upload / Confirmation Card */}
           <div
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => !pendingChat && !isParsing && fileInputRef.current?.click()}
             onDragOver={handleDragOver}
             onDragEnter={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`w-full glass rounded-3xl p-8 sm:p-12 flex flex-col items-center text-center transition-all duration-300 border-2 cursor-pointer group ${
-              isDragging
-                ? 'border-pink bg-pink/20 scale-[1.02] shadow-2xl ring-4 ring-pink/20'
-                : 'border-white/15 hover:border-pink/60 shadow-xl'
+            className={`w-full glass rounded-3xl p-8 sm:p-10 flex flex-col items-center text-center transition-all duration-300 border-2 ${
+              pendingChat
+                ? 'border-white/20 shadow-2xl cursor-default'
+                : isDragging
+                ? 'border-pink bg-pink/20 scale-[1.02] shadow-2xl ring-4 ring-pink/20 cursor-pointer'
+                : 'border-white/15 hover:border-pink/60 shadow-xl cursor-pointer group'
             }`}
           >
-            {/* Upload Icon Badge */}
-            <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-pink mb-6 shadow-sm group-hover:scale-110 transition-transform">
-              <svg className="w-8 h-8 text-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                />
-              </svg>
-            </div>
+            {pendingChat ? (
+              // ----------------- PENDING CONFIRMATION & MAPPING STEP -----------------
+              <div className="w-full flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+                {/* Detected Platform Badge */}
+                {pendingChat.platform === 'telegram' ? (
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-semibold mb-5 shadow-sm">
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z" />
+                    </svg>
+                    <span>Detected: Telegram export</span>
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold mb-5 shadow-sm">
+                    <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.81 13.47 3.81 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z" />
+                    </svg>
+                    <span>Detected: WhatsApp export</span>
+                  </div>
+                )}
 
-            {/* Headline */}
-            <h2 className="font-serif text-2xl sm:text-3xl text-cloud font-semibold mb-2 leading-tight">
-              Drop your chat export here
-            </h2>
+                <h2 className="font-serif text-2xl sm:text-3xl text-cloud font-semibold mb-2 leading-tight">
+                  Ready to analyze chat
+                </h2>
 
-            <p className="font-sans text-cloud/60 text-sm mb-6 max-w-sm">
-              Drag & drop your WhatsApp <code className="text-pink bg-white/10 px-1.5 py-0.5 rounded font-mono font-semibold">.txt</code> file anywhere here, or click to browse.
-            </p>
+                <p className="font-sans text-cloud/60 text-xs sm:text-sm mb-6 max-w-sm">
+                  {pendingChat.fileName} &middot;{' '}
+                  <strong className="text-cloud font-semibold">
+                    {pendingChat.messages.filter((m) => m.type !== 'system').length.toLocaleString()}
+                  </strong>{' '}
+                  messages found
+                </p>
 
-            {/* Hidden native file input */}
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".txt,text/plain"
-              onChange={handleFileChange}
-              className="hidden"
-            />
+                {/* Nickname Mapping Dropdowns */}
+                <div className="w-full bg-white/[0.04] border border-white/10 rounded-2xl p-4 sm:p-5 mb-6 text-left">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="font-sans text-xs uppercase tracking-wider text-pink font-semibold">
+                      Map to Her &amp; Him
+                    </span>
+                    <span className="text-[11px] text-cloud/50">Assign names</span>
+                  </div>
 
-            {/* Large Primary Action Button */}
-            <div className="mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
-              <GlassButton
-                text="Choose .txt File"
-                onClick={() => fileInputRef.current?.click()}
-              />
-            </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    {/* Her dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-sans text-cloud/70">
+                        Which {pendingChat.platform === 'telegram' ? 'Telegram' : 'chat'} name is{' '}
+                        <strong className="text-pink font-bold">Her</strong>?
+                      </label>
+                      <select
+                        value={pendingChat.her}
+                        onChange={(e) => handlePendingHerChange(e.target.value)}
+                        className="w-full bg-night border border-white/20 rounded-xl px-3 py-2 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                      >
+                        {pendingChat.rawSenders.map((s) => (
+                          <option key={s} value={s} className="bg-night text-cloud">
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
 
-            {/* Format note */}
-            <span className="font-sans text-xs text-cloud/50 font-medium mt-2">
-              Only <strong className="text-cloud font-bold">.txt</strong> files supported · Exported without media
-            </span>
+                    {/* Him dropdown */}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-sans text-cloud/70">
+                        Which {pendingChat.platform === 'telegram' ? 'Telegram' : 'chat'} name is{' '}
+                        <strong className="text-pink font-bold">Him</strong>?
+                      </label>
+                      <select
+                        value={pendingChat.him}
+                        onChange={(e) => handlePendingHimChange(e.target.value)}
+                        className="w-full bg-night border border-white/20 rounded-xl px-3 py-2 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                      >
+                        {pendingChat.rawSenders.map((s) => (
+                          <option key={s} value={s} className="bg-night text-cloud">
+                            {s}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
 
-            {/* Error Message Alert */}
-            {errorMessage && (
-              <div
-                onClick={(e) => e.stopPropagation()}
-                className="mt-6 w-full p-4 rounded-2xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs font-sans text-left flex items-start gap-3 animate-fade-in shadow-sm"
-              >
-                <svg className="w-4 h-4 shrink-0 mt-0.5 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div className="flex-1">{errorMessage}</div>
+                {/* Primary Action Button */}
+                <div className="w-full flex flex-col items-center gap-3">
+                  <GlassButton text="Confirm &amp; Explore Story ✨" onClick={handleConfirmPending} />
+
+                  <button
+                    type="button"
+                    onClick={handleResetChat}
+                    className="text-xs text-cloud/50 hover:text-cloud transition-colors underline cursor-pointer"
+                  >
+                    Choose a different file
+                  </button>
+                </div>
               </div>
+            ) : (
+              // ----------------- DEFAULT INITIAL DROPZONE -----------------
+              <>
+                {/* Upload Icon Badge */}
+                <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-pink mb-6 shadow-sm group-hover:scale-110 transition-transform">
+                  {isParsing ? (
+                    <svg className="w-8 h-8 text-pink animate-spin" viewBox="0 0 24 24" fill="none">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                  ) : (
+                    <svg className="w-8 h-8 text-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                      />
+                    </svg>
+                  )}
+                </div>
+
+                {/* Headline */}
+                <h2 className="font-serif text-2xl sm:text-3xl text-cloud font-semibold mb-2 leading-tight">
+                  {isParsing ? 'Reading your chat export...' : 'Drop your chat export here'}
+                </h2>
+
+                <p className="font-sans text-cloud/60 text-sm mb-6 max-w-sm">
+                  Drag &amp; drop your WhatsApp{' '}
+                  <code className="text-pink bg-white/10 px-1.5 py-0.5 rounded font-mono font-semibold">
+                    .txt
+                  </code>{' '}
+                  or Telegram{' '}
+                  <code className="text-sky-300 bg-white/10 px-1.5 py-0.5 rounded font-mono font-semibold">
+                    .json
+                  </code>{' '}
+                  file anywhere here, or click to browse.
+                </p>
+
+                {/* Hidden native file input accepting .txt and .json */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt,.json,text/plain,application/json"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+
+                {/* Primary Action Button */}
+                <div className="mt-2 mb-4" onClick={(e) => e.stopPropagation()}>
+                  <GlassButton
+                    text={isParsing ? 'Parsing Chat...' : 'Choose .txt or .json File'}
+                    onClick={() => fileInputRef.current?.click()}
+                  />
+                </div>
+
+                {/* Format note */}
+                <span className="font-sans text-xs text-cloud/50 font-medium mt-2">
+                  Supports WhatsApp <strong className="text-cloud font-bold">.txt</strong> &middot; Telegram Desktop{' '}
+                  <strong className="text-cloud font-bold">.json</strong>
+                </span>
+
+                {/* Error Message Alert */}
+                {errorMessage && (
+                  <div
+                    onClick={(e) => e.stopPropagation()}
+                    className="mt-6 w-full p-4 rounded-2xl bg-red-950/60 border border-red-500/40 text-red-200 text-xs font-sans text-left flex items-start gap-3 animate-fade-in shadow-sm"
+                  >
+                    <svg
+                      className="w-4 h-4 shrink-0 mt-0.5 text-red-400"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+                      />
+                    </svg>
+                    <div className="flex-1">{errorMessage}</div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Quick Help Guide */}
-          <div className="mt-8 text-center max-w-sm">
-            <p className="font-sans text-cloud/50 text-xs leading-relaxed">
-              How to export: In WhatsApp, open chat → tap <strong className="text-cloud/80">More (⋮)</strong> → <strong className="text-cloud/80">Export chat</strong> → choose <strong className="text-cloud/80">Without Media</strong>.
-            </p>
-          </div>
+          {!pendingChat && (
+            <div className="mt-8 text-center max-w-md space-y-2">
+              <p className="font-sans text-cloud/50 text-xs leading-relaxed">
+                <strong className="text-cloud/80">WhatsApp:</strong> Open chat &rarr; tap{' '}
+                <strong className="text-cloud/80">More (&vellip;)</strong> &rarr;{' '}
+                <strong className="text-cloud/80">Export chat</strong> &rarr; choose{' '}
+                <strong className="text-cloud/80">Without Media</strong>.
+              </p>
+              <p className="font-sans text-cloud/50 text-xs leading-relaxed">
+                <strong className="text-cloud/80">Telegram:</strong> In Telegram Desktop &rarr; open chat &rarr;{' '}
+                <strong className="text-cloud/80">Export chat history</strong> &rarr; format:{' '}
+                <strong className="text-cloud/80">Machine-readable JSON</strong>.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
   }
 
+  // Current active mapping for settings modal
+  const currentStoredConfig = getStoredNicknameConfig();
+  const currentHerSender = rawSenders?.[0]
+    ? currentStoredConfig.mapping?.[rawSenders[0]] === 'Her'
+      ? rawSenders[0]
+      : rawSenders[1]
+    : 'Her';
+  const currentHimSender = rawSenders?.[0]
+    ? currentStoredConfig.mapping?.[rawSenders[0]] === 'Him'
+      ? rawSenders[0]
+      : rawSenders[1]
+    : 'Him';
+
   return (
     <div className="bg-night text-cloud relative">
       <QuickNav />
+
+      {/* Floating Settings Button in top right */}
+      <div className="fixed top-4 right-4 sm:right-6 z-50">
+        <button
+          type="button"
+          onClick={() => setIsSettingsOpen(true)}
+          title="Chat Settings & Nickname Mapping"
+          className="px-3 py-1.5 rounded-full glass backdrop-blur-md bg-[#021A54]/85 border border-white/15 text-cloud/80 hover:text-cloud hover:border-pink/40 shadow-xl transition-all duration-150 flex items-center gap-1.5 text-xs font-sans cursor-pointer active:scale-95"
+        >
+          <svg className="w-3.5 h-3.5 text-pink" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+            />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+          <span className="hidden sm:inline">Settings</span>
+        </button>
+      </div>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        platform={platform}
+        rawSenders={rawSenders}
+        currentMapping={{ her: currentHerSender, him: currentHimSender }}
+        onSaveMapping={handleSaveSettingsMapping}
+        onResetChat={handleResetChat}
+      />
+
       <Hero messages={messages} senders={senders} />
       <Milestones messages={messages} senders={senders} />
       <CalendarHeat messages={messages} senders={senders} />

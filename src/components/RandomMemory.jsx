@@ -50,13 +50,6 @@ function RandomMemory({ messages }) {
       ref={sectionRef}
       className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-navy"
     >
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[22vw] sm:text-[18vw] leading-none font-semibold"
-      >
-        ✦
-      </div>
-
       <div className="memory-container relative z-10 max-w-2xl">
         <p className="font-sans text-blush/70 text-sm mb-4 sm:mb-8">a random bookmark</p>
 
@@ -68,10 +61,9 @@ function RandomMemory({ messages }) {
           <button
             type="button"
             onClick={pickMemory}
-            className="self-start sm:self-auto px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-cloud text-xs font-sans font-semibold tracking-wide active:scale-95 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg flex items-center gap-2"
+            className="self-start sm:self-auto px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-cloud text-xs font-sans font-semibold tracking-wide active:scale-95 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg"
           >
-            <span>Roll another memory</span>
-            <span>🎲</span>
+            Roll another memory
           </button>
         </div>
 

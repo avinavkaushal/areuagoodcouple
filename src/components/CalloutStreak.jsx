@@ -35,13 +35,6 @@ function CalloutStreak({ messages, senders }) {
       ref={sectionRef}
       className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night"
     >
-      <div
-        aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[24vw] sm:text-[18vw] leading-none font-semibold"
-      >
-        ☼
-      </div>
-
       <div className="relative z-10 max-w-2xl">
         <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">first & last hello</p>
 
@@ -53,7 +46,6 @@ function CalloutStreak({ messages, senders }) {
           {/* Good Morning Card */}
           <div className="streak-card glass rounded-3xl p-6 sm:p-8 space-y-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🌅</span>
               <span className="font-serif text-xl font-semibold text-cloud">Good Morning</span>
             </div>
 
@@ -77,7 +69,6 @@ function CalloutStreak({ messages, senders }) {
           {/* Good Night Card */}
           <div className="streak-card glass rounded-3xl p-6 sm:p-8 space-y-4">
             <div className="flex items-center gap-2">
-              <span className="text-2xl">🌙</span>
               <span className="font-serif text-xl font-semibold text-cloud">Good Night</span>
             </div>
 

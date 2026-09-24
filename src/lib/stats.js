@@ -1,8 +1,38 @@
 const EMOJI_RE = /(\p{Extended_Pictographic})/gu;
 
+export function formatDuration(firstDate, lastDate) {
+  if (!firstDate || !lastDate) return 'our time';
+  const start = firstDate instanceof Date ? firstDate : new Date(firstDate);
+  const end = lastDate instanceof Date ? lastDate : new Date(lastDate);
+  const diffDays = Math.max(1, Math.round((end - start) / (1000 * 60 * 60 * 24)));
+
+  if (diffDays < 30) {
+    return diffDays === 1 ? '1 day' : `${diffDays} days`;
+  }
+  if (diffDays < 365) {
+    const months = Math.max(1, Math.round(diffDays / 30.4375));
+    return months === 1 ? '1 month' : `${months} months`;
+  }
+  const years = Math.floor(diffDays / 365.25);
+  const remMonths = Math.round((diffDays % 365.25) / 30.4375);
+  if (remMonths === 0 || remMonths === 12) {
+    const totalYears = remMonths === 12 ? years + 1 : years;
+    return totalYears === 1 ? '1 year' : `${totalYears} years`;
+  }
+  const yStr = years === 1 ? '1 year' : `${years} years`;
+  const mStr = remMonths === 1 ? '1 month' : `${remMonths} months`;
+  return `${yStr}, ${mStr}`;
+}
+
+export function formatSinceDate(firstDate) {
+  if (!firstDate) return '';
+  const date = firstDate instanceof Date ? firstDate : new Date(firstDate);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 export function getEmojiStats(messages) {
   const counts = {}; // { sender: { emoji: count } }
-  for (const m of messages) {
+  for (const m of (messages || [])) {
     const emojis = m.text.match(EMOJI_RE) || [];
     if (!counts[m.sender]) counts[m.sender] = {};
     for (const e of emojis) {
@@ -17,12 +47,13 @@ export function getEmojiStats(messages) {
   return result;
 }
 
-export function getEmojiComparison(messages, topN = 8) {
-  const order = ['Her', 'Him']; // fixed, so bars stay consistent side
-  const bySender = { Her: {}, Him: {} };
+export function getEmojiComparison(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const order = [p1, p2];
+  const bySender = { [p1]: {}, [p2]: {} };
   const total = {};
 
-  for (const m of messages) {
+  for (const m of (messages || [])) {
     const emojis = m.text.match(EMOJI_RE) || [];
     if (!bySender[m.sender]) continue;
     for (const e of emojis) {
@@ -33,13 +64,13 @@ export function getEmojiComparison(messages, topN = 8) {
 
   const topEmojis = Object.entries(total)
     .sort((a, b) => b[1] - a[1])
-    .slice(0, topN)
+    .slice(0, 8)
     .map(([e]) => e);
 
   const rows = topEmojis.map((e) => ({
     emoji: e,
-    left: bySender[order[0]][e] || 0,
-    right: bySender[order[1]][e] || 0,
+    left: bySender[p1]?.[e] || 0,
+    right: bySender[p2]?.[e] || 0,
   }));
 
   const maxVal = Math.max(...rows.map((r) => Math.max(r.left, r.right)), 1);
@@ -48,30 +79,62 @@ export function getEmojiComparison(messages, topN = 8) {
 }
 
 export function getKeywordStats(messages, keyword) {
-  const kw = keyword.trim().toLowerCase();
-  if (!kw) return null;
-  const hits = messages.filter(m => m.text.toLowerCase().includes(kw));
-  const count = hits.length;
+  const kw = (keyword || '').trim().toLowerCase();
+  if (!kw || !messages || messages.length === 0) return null;
 
-  const hourCounts = Array(24).fill(0);
-  hits.forEach(m => hourCounts[m.date.getHours()]++);
-  const topHour = hourCounts.indexOf(Math.max(...hourCounts));
+  const hourCounts = new Array(24).fill(0);
+  const hitTimestamps = [];
+  let count = 0;
 
-  const gaps = [];
-  for (let i = 1; i < hits.length; i++) {
-    gaps.push((hits[i].date - hits[i - 1].date) / (1000 * 60 * 60 * 24)); // days
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (m.text.toLowerCase().includes(kw)) {
+      count++;
+      const h = m.date.getHours();
+      hourCounts[h]++;
+      hitTimestamps.push(m.date.getTime());
+    }
   }
-  const avgGapDays = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : null;
 
-  const timeline = hits.map(m => ({ date: m.date, sender: m.sender }));
+  if (count === 0) {
+    return { count: 0, topHour: null, avgGapDays: null, timelineTimestamps: [] };
+  }
 
-  return { count, topHour, avgGapDays, timeline, hits };
+  let topHour = 0;
+  let maxHCount = -1;
+  for (let h = 0; h < 24; h++) {
+    if (hourCounts[h] > maxHCount) {
+      maxHCount = hourCounts[h];
+      topHour = h;
+    }
+  }
+
+  let avgGapDays = null;
+  if (hitTimestamps.length > 1) {
+    let totalGapMs = 0;
+    for (let i = 1; i < hitTimestamps.length; i++) {
+      totalGapMs += hitTimestamps[i] - hitTimestamps[i - 1];
+    }
+    avgGapDays = totalGapMs / (hitTimestamps.length - 1) / (1000 * 60 * 60 * 24);
+  }
+
+  let timelineTimestamps = [];
+  if (hitTimestamps.length <= 500) {
+    timelineTimestamps = hitTimestamps;
+  } else {
+    const step = (hitTimestamps.length - 1) / 499;
+    for (let i = 0; i < 500; i++) {
+      timelineTimestamps.push(hitTimestamps[Math.round(i * step)]);
+    }
+  }
+
+  return { count, topHour, avgGapDays, timelineTimestamps };
 }
 
 export function getHeatmapData(messages) {
   // grid[day][hour] = count, day 0=Sun..6=Sat
   const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-  messages.forEach(m => {
+  (messages || []).forEach(m => {
     grid[m.date.getDay()][m.date.getHours()]++;
   });
   return grid;
@@ -80,6 +143,15 @@ export function getHeatmapData(messages) {
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export function getHighlights(messages) {
+  if (!messages || messages.length === 0) {
+    return {
+      busiestDay: null,
+      busiestMonth: null,
+      longestStreak: 0,
+      longestGapDays: 0,
+    };
+  }
+
   const dayCounts = {};
   const monthCounts = {};
   messages.forEach(m => {
@@ -99,13 +171,18 @@ export function getHighlights(messages) {
   let longestStreak = 1, curStreak = 1;
   for (let i = 1; i < uniqueDaysSorted.length; i++) {
     const diff = (uniqueDaysSorted[i] - uniqueDaysSorted[i - 1]) / (1000 * 60 * 60 * 24);
-    if (diff === 1) { curStreak++; longestStreak = Math.max(longestStreak, curStreak); }
-    else curStreak = 1;
+    if (Math.round(diff) === 1) {
+      curStreak++;
+      longestStreak = Math.max(longestStreak, curStreak);
+    } else {
+      curStreak = 1;
+    }
   }
 
   let longestGapDays = 0;
   for (let i = 1; i < uniqueDaysSorted.length; i++) {
-    longestGapDays = Math.max(longestGapDays, (uniqueDaysSorted[i] - uniqueDaysSorted[i - 1]) / (1000 * 60 * 60 * 24));
+    const diff = (uniqueDaysSorted[i] - uniqueDaysSorted[i - 1]) / (1000 * 60 * 60 * 24);
+    longestGapDays = Math.max(longestGapDays, diff);
   }
 
   const [year, month] = busiestMonthEntry ? busiestMonthEntry[0].split('-').map(Number) : [null, null];
@@ -128,12 +205,13 @@ const STOPWORDS = new Set([
   'nahi','kya','to','me','my','your','are','was','be','but','so','just','not','de','do','media','omitted',
   'voice','deleted','message','tum','tu','have','rhi','hum','ok','get','we','nahi','aur','nhi',
   'mein','don','can','tho','will','mujhe','tumhe','waha','kuch','kya','hogi','kar','liye',
-  'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera',
+  'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera', 'https',
+  'http', 'ker', 'bro', 'koi', 
 ]);
 
 export function getWordCloudData(messages, topN = 40) {
   const counts = {};
-  messages.forEach(m => {
+  (messages || []).forEach(m => {
     const words = m.text.toLowerCase().match(/[a-z\p{sc=Devanagari}]+/gu) || [];
     words.forEach(w => {
       if (w.length < 3 || STOPWORDS.has(w)) return;
@@ -144,27 +222,31 @@ export function getWordCloudData(messages, topN = 40) {
     .map(([text, value]) => ({ text, value }));
 }
 
-export function getMediaStats(messages) {
-  let her = 0;
-  let him = 0;
-  messages.forEach(m => {
-    if (m.text.includes('<Media omitted>')) {
-      if (m.sender === 'Her') her++;
-      else if (m.sender === 'Him') him++;
+export function getMediaStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  let count1 = 0;
+  let count2 = 0;
+  (messages || []).forEach(m => {
+    if (m.text.includes('<Media omitted>') || m.text.includes('omitted>')) {
+      if (m.sender === p1) count1++;
+      else if (m.sender === p2) count2++;
     }
   });
-  const total = her + him;
-  return { her, him, total };
+  const total = count1 + count2;
+  return { [p1]: count1, [p2]: count2, count1, count2, total };
 }
 
 export function getOverviewStats(messages) {
+  if (!messages || messages.length === 0) {
+    return { totalMessages: 0, totalWords: 0, uniqueDays: 0, totalMedia: 0, firstDate: null, lastDate: null };
+  }
   const totalMessages = messages.length;
   const totalWords = messages.reduce((sum, m) => sum + m.text.trim().split(/\s+/).filter(Boolean).length, 0);
   const uniqueDays = new Set(messages.map(m => m.date.toDateString())).size;
-  const mediaStats = getMediaStats(messages);
+  const totalMedia = messages.filter(m => m.text.includes('<Media omitted>') || m.text.includes('omitted>')).length;
   const firstDate = messages[0]?.date;
   const lastDate = messages[messages.length - 1]?.date;
-  return { totalMessages, totalWords, uniqueDays, totalMedia: mediaStats.total, firstDate, lastDate };
+  return { totalMessages, totalWords, uniqueDays, totalMedia, firstDate, lastDate };
 }
 
 export function getPeakSlot(grid) {
@@ -207,32 +289,37 @@ export function getCalendarHeat(messages) {
   return result;
 }
 
-export function getInitiatorStats(messages) {
+export function getInitiatorStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
   const firstMsgByDay = {}; // { YYYY-MM-DD: sender }
-  messages.forEach(m => {
+  (messages || []).forEach(m => {
     const key = `${m.date.getFullYear()}-${String(m.date.getMonth() + 1).padStart(2, '0')}-${String(m.date.getDate()).padStart(2, '0')}`;
     if (!firstMsgByDay[key]) {
       firstMsgByDay[key] = m.sender;
     }
   });
 
-  let her = 0;
-  let him = 0;
+  let count1 = 0;
+  let count2 = 0;
   Object.values(firstMsgByDay).forEach(sender => {
-    if (sender === 'Her') her++;
-    else if (sender === 'Him') him++;
+    if (sender === p1) count1++;
+    else if (sender === p2) count2++;
   });
 
-  const total = her + him;
-  const herPct = total > 0 ? Math.round((her / total) * 100) : 0;
-  const himPct = total > 0 ? 100 - herPct : 0;
+  const total = count1 + count2;
+  const p1Pct = total > 0 ? Math.round((count1 / total) * 100) : 0;
+  const p2Pct = total > 0 ? 100 - p1Pct : 0;
 
-  return { her, him, herPct, himPct };
+  return {
+    p1: { name: p1, count: count1, pct: p1Pct },
+    p2: { name: p2, count: count2, pct: p2Pct },
+  };
 }
 
-export function getLongestMessage(messages) {
+export function getLongestMessage(messages, senders) {
+  const defaultSender = senders && senders[0] ? senders[0] : 'Aru';
   if (!messages || messages.length === 0) {
-    return { text: '', wordCount: 0, sender: 'Her', date: new Date() };
+    return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
 
   let best = null;
@@ -247,7 +334,7 @@ export function getLongestMessage(messages) {
   });
 
   if (!best) {
-    return { text: '', wordCount: 0, sender: 'Her', date: new Date() };
+    return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
 
   const rawText = best.text.trim();
@@ -261,52 +348,57 @@ export function getLongestMessage(messages) {
   };
 }
 
-export function getLateNightStats(messages) {
-  let herTotal = 0;
-  let himTotal = 0;
-  let herLate = 0;
-  let himLate = 0;
+export function getLateNightStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  let count1Total = 0;
+  let count2Total = 0;
+  let count1Late = 0;
+  let count2Late = 0;
 
-  messages.forEach(m => {
+  (messages || []).forEach(m => {
     const h = m.date.getHours();
     const isLate = h >= 0 && h < 4;
-    if (m.sender === 'Her') {
-      herTotal++;
-      if (isLate) herLate++;
-    } else if (m.sender === 'Him') {
-      himTotal++;
-      if (isLate) himLate++;
+    if (m.sender === p1) {
+      count1Total++;
+      if (isLate) count1Late++;
+    } else if (m.sender === p2) {
+      count2Total++;
+      if (isLate) count2Late++;
     }
   });
 
-  const herPct = herTotal > 0 ? Math.round((herLate / herTotal) * 100) : 0;
-  const himPct = himTotal > 0 ? Math.round((himLate / himTotal) * 100) : 0;
+  const p1Pct = count1Total > 0 ? Math.round((count1Late / count1Total) * 100) : 0;
+  const p2Pct = count2Total > 0 ? Math.round((count2Late / count2Total) * 100) : 0;
 
   return {
-    her: { count: herLate, pct: herPct },
-    him: { count: himLate, pct: himPct },
+    p1: { name: p1, count: count1Late, pct: p1Pct },
+    p2: { name: p2, count: count2Late, pct: p2Pct },
   };
 }
 
-export function getVerbosityStats(messages) {
-  let herWords = 0;
-  let herMsgs = 0;
-  let himWords = 0;
-  let himMsgs = 0;
+export function getVerbosityStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  let words1 = 0;
+  let msgs1 = 0;
+  let words2 = 0;
+  let msgs2 = 0;
 
-  messages.forEach(m => {
+  (messages || []).forEach(m => {
     const words = m.text.trim().split(/\s+/).filter(Boolean).length;
-    if (m.sender === 'Her') {
-      herWords += words;
-      herMsgs++;
-    } else if (m.sender === 'Him') {
-      himWords += words;
-      himMsgs++;
+    if (m.sender === p1) {
+      words1 += words;
+      msgs1++;
+    } else if (m.sender === p2) {
+      words2 += words;
+      msgs2++;
     }
   });
 
-  const herAvg = herMsgs > 0 ? +(herWords / herMsgs).toFixed(1) : 0;
-  const himAvg = himMsgs > 0 ? +(himWords / himMsgs).toFixed(1) : 0;
+  const avg1 = msgs1 > 0 ? +(words1 / msgs1).toFixed(1) : 0;
+  const avg2 = msgs2 > 0 ? +(words2 / msgs2).toFixed(1) : 0;
 
-  return { her: herAvg, him: himAvg };
+  return {
+    p1: { name: p1, avg: avg1 },
+    p2: { name: p2, avg: avg2 },
+  };
 }

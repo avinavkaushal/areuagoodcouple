@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { getInitiatorStats } from '../lib/stats';
 
-function Initiator({ messages }) {
-  const stats = useMemo(() => getInitiatorStats(messages), [messages]);
+function Initiator({ messages, senders }) {
+  const stats = useMemo(() => getInitiatorStats(messages, senders), [messages, senders]);
 
-  const leader = stats.herPct >= stats.himPct ? 'Her' : 'Him';
-  const leaderPct = stats.herPct >= stats.himPct ? stats.herPct : stats.himPct;
+  const leader = stats.p1.pct >= stats.p2.pct ? stats.p1.name : stats.p2.name;
+  const leaderPct = stats.p1.pct >= stats.p2.pct ? stats.p1.pct : stats.p2.pct;
 
   return (
     <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-cloud">
@@ -28,10 +28,10 @@ function Initiator({ messages }) {
           <div className="flex justify-between items-baseline font-serif text-navy text-lg sm:text-xl">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-pink inline-block" />
-              <span>Her ({stats.herPct}%)</span>
+              <span>{stats.p1.name} ({stats.p1.pct}%)</span>
             </div>
             <div className="flex items-center gap-2">
-              <span>Him ({stats.himPct}%)</span>
+              <span>{stats.p2.name} ({stats.p2.pct}%)</span>
               <span className="w-3 h-3 rounded-full bg-navy inline-block" />
             </div>
           </div>
@@ -39,18 +39,18 @@ function Initiator({ messages }) {
           {/* Proportional split bar */}
           <div className="h-4 w-full bg-navy/10 rounded-full flex overflow-hidden p-0.5">
             <div
-              style={{ width: `${stats.herPct}%` }}
+              style={{ width: `${stats.p1.pct}%` }}
               className="h-full bg-pink rounded-l-full transition-all duration-700"
             />
             <div
-              style={{ width: `${stats.himPct}%` }}
+              style={{ width: `${stats.p2.pct}%` }}
               className="h-full bg-navy rounded-r-full transition-all duration-700"
             />
           </div>
 
           <div className="flex justify-between text-xs font-sans text-navy/50">
-            <span>{stats.her} mornings started</span>
-            <span>{stats.him} mornings started</span>
+            <span>{stats.p1.count.toLocaleString()} mornings started</span>
+            <span>{stats.p2.count.toLocaleString()} mornings started</span>
           </div>
         </div>
       </div>

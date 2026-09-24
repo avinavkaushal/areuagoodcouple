@@ -1,7 +1,11 @@
+import { useMemo } from 'react';
 import { getEmojiComparison } from '../lib/stats';
 
-function EmojiStats({ messages }) {
-  const { order, rows, maxVal } = getEmojiComparison(messages);
+function EmojiStats({ messages, senders }) {
+  const { order, rows, maxVal } = useMemo(
+    () => getEmojiComparison(messages, senders),
+    [messages, senders]
+  );
 
   return (
     <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-cloud">

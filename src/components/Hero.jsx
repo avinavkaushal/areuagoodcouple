@@ -1,10 +1,19 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
+import { formatDuration, formatSinceDate } from '../lib/stats';
 
-function Hero() {
+function Hero({ messages, senders }) {
   const lettersRef = useRef(null);
   const subRef = useRef(null);
   const heartRef = useRef(null);
+
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const word = `${p1}${p2}`;
+
+  const firstDate = messages?.[0]?.date;
+  const lastDate = messages?.[messages?.length - 1]?.date;
+  const duration = formatDuration(firstDate, lastDate);
+  const sinceDate = formatSinceDate(firstDate);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -22,9 +31,7 @@ function Hero() {
     });
 
     return () => ctx.revert();
-  }, []);
-
-  const word = 'AruAvu';
+  }, [word]);
 
   return (
     <section className="relative overflow-hidden bg-cloud py-24 sm:py-32 flex flex-col justify-center px-8 sm:px-16">
@@ -40,7 +47,7 @@ function Hero() {
           className="font-serif font-semibold text-navy leading-none text-[18vw] sm:text-[9vw] flex flex-wrap"
         >
           {word.split('').map((ch, i) => (
-            <span key={i} className="inline-block">{ch}</span>
+            <span key={i} className="inline-block">{ch === ' ' ? '\u00A0' : ch}</span>
           ))}
         </h1>
 
@@ -53,7 +60,7 @@ function Hero() {
             />
           </svg>
           <p ref={subRef} className="font-sans text-navy/70 text-sm sm:text-base tracking-tight">
-            two years, one chat, since Oct 2024
+            {duration}, one chat{sinceDate ? `, since ${sinceDate}` : ''}
           </p>
         </div>
       </div>

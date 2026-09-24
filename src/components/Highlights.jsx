@@ -1,17 +1,20 @@
+import { useMemo } from 'react';
 import { getHighlights, getLateNightStats, getVerbosityStats } from '../lib/stats';
 
-function Highlights({ messages }) {
-  const h = getHighlights(messages);
-  const late = getLateNightStats(messages);
-  const verb = getVerbosityStats(messages);
+function Highlights({ messages, senders }) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+
+  const h = useMemo(() => getHighlights(messages), [messages]);
+  const late = useMemo(() => getLateNightStats(messages, senders), [messages, senders]);
+  const verb = useMemo(() => getVerbosityStats(messages, senders), [messages, senders]);
 
   const rows = [
-    { label: 'busiest day', value: h.busiestDay?.count, detail: h.busiestDay?.label, size: 'text-5xl sm:text-6xl' },
+    { label: 'busiest day', value: h.busiestDay?.count?.toLocaleString() || 0, detail: h.busiestDay?.label, size: 'text-5xl sm:text-6xl' },
     { label: 'longest we talked, daily, in a row', value: `${h.longestStreak}`, detail: 'days in a row', size: 'text-5xl sm:text-6xl' },
-    { label: 'busiest month', value: h.busiestMonth?.count, detail: h.busiestMonth?.label, size: 'text-4xl sm:text-5xl' },
+    { label: 'busiest month', value: h.busiestMonth?.count?.toLocaleString() || 0, detail: h.busiestMonth?.label, size: 'text-4xl sm:text-5xl' },
     { label: 'longest we went quiet', value: h.longestGapDays, detail: 'days apart', size: 'text-4xl sm:text-5xl' },
-    { label: 'late-night messages (12am – 4am)', value: `${late.her.pct}% · ${late.him.pct}%`, detail: 'Her · Him (% of own messages)', size: 'text-3xl sm:text-4xl' },
-    { label: 'average words per message', value: `${verb.her} · ${verb.him}`, detail: 'Her · Him (words/msg)', size: 'text-3xl sm:text-4xl' },
+    { label: 'late-night messages (12am – 4am)', value: `${late.p1.pct}% · ${late.p2.pct}%`, detail: `${p1} · ${p2} (% of own messages)`, size: 'text-3xl sm:text-4xl' },
+    { label: 'average words per message', value: `${verb.p1.avg} · ${verb.p2.avg}`, detail: `${p1} · ${p2} (words/msg)`, size: 'text-3xl sm:text-4xl' },
   ];
 
   return (

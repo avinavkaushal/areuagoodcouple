@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { getLongestMessage } from '../lib/stats';
 
-function LongestMessage({ messages }) {
-  const longest = useMemo(() => getLongestMessage(messages), [messages]);
+function LongestMessage({ messages, senders }) {
+  const longest = useMemo(() => getLongestMessage(messages, senders), [messages, senders]);
 
   const dateStr = longest.date
     ? new Date(longest.date).toLocaleDateString('en-US', {

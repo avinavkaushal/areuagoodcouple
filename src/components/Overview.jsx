@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
-import { getOverviewStats } from '../lib/stats';
+import { getOverviewStats, formatDuration } from '../lib/stats';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -13,6 +13,7 @@ function Overview({ messages }) {
   const mediaRef = useRef(null);
 
   const stats = getOverviewStats(messages);
+  const duration = formatDuration(stats.firstDate, stats.lastDate);
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -56,7 +57,7 @@ function Overview({ messages }) {
 
       <div className="relative z-10">
         <p className="font-sans text-navy/50 text-sm mb-4 sm:mb-8">
-          two years, in numbers
+          {duration}, in numbers
         </p>
 
         <div className="flex flex-col sm:flex-row sm:items-end gap-8 sm:gap-16">

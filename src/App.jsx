@@ -13,13 +13,9 @@ import LongestMessage from './components/LongestMessage';
 import Outro from './components/Outro';
 import GlassButton from './components/GlassButton';
 
-const NAME_MAP = {
-  "Aru": "Her",
-  "Aviiii": "Him"
-};
-
 function App() {
   const [messages, setMessages] = useState(null);
+  const [senders, setSenders] = useState(null);
   const [isDragging, setIsDragging] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
   const fileInputRef = useRef(null);
@@ -46,17 +42,20 @@ function App() {
           return;
         }
 
-        const parsed = parseChat(text).map((m) => ({
-          ...m,
-          sender: NAME_MAP[m.sender.trim()] || m.sender,
-        }));
+        const { messages: parsed, senders: detectedSenders } = parseChat(text);
 
         if (!parsed || parsed.length === 0) {
           setErrorMessage('No chat messages could be parsed. Please make sure this is an unedited WhatsApp export without media.');
           return;
         }
 
+        if (detectedSenders.length !== 2) {
+          setErrorMessage('This tool works with 2-person chats only.');
+          return;
+        }
+
         setMessages(parsed);
+        setSenders(detectedSenders);
       } catch {
         setErrorMessage('Failed to read and parse this file. Please ensure it is a valid WhatsApp chat .txt export.');
       }
@@ -185,17 +184,17 @@ function App() {
 
   return (
     <div className="bg-cloud">
-      <Hero />
-      <Overview messages={messages} />
-      <CalendarHeat messages={messages} />
-      <KeywordSearch messages={messages} />
-      <EmojiStats messages={messages} />
-      <ActivityHeatmap messages={messages} />
-      <Initiator messages={messages} />
-      <Highlights messages={messages} />
-      <WordCloud messages={messages} />
-      <LongestMessage messages={messages} />
-      <Outro messages={messages} />
+      <Hero messages={messages} senders={senders} />
+      <Overview messages={messages} senders={senders} />
+      <CalendarHeat messages={messages} senders={senders} />
+      <KeywordSearch messages={messages} senders={senders} />
+      <EmojiStats messages={messages} senders={senders} />
+      <ActivityHeatmap messages={messages} senders={senders} />
+      <Initiator messages={messages} senders={senders} />
+      <Highlights messages={messages} senders={senders} />
+      <WordCloud messages={messages} senders={senders} />
+      <LongestMessage messages={messages} senders={senders} />
+      <Outro messages={messages} senders={senders} />
     </div>
   );
 }

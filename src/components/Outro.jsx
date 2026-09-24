@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react';
 import gsap from 'gsap';
 
-function Outro({ messages }) {
+function Outro({ messages, senders }) {
   const heartRef = useRef(null);
   const textRef = useRef(null);
   const sectionRef = useRef(null);
 
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
   const first = messages?.[0]?.date;
-  const dayCount = first ? Math.round((new Date() - first) / (1000 * 60 * 60 * 24)) : 0;
+  const last = messages?.[messages?.length - 1]?.date;
+  const dayCount = first && last
+    ? Math.max(1, Math.round((new Date(last).getTime() - new Date(first).getTime()) / (1000 * 60 * 60 * 24)) + 1)
+    : 0;
 
   useEffect(() => {
     const ctx = gsap.context(() => {
@@ -55,7 +59,7 @@ function Outro({ messages }) {
 
         <p ref={textRef} className="font-serif text-cloud text-2xl sm:text-4xl max-w-xl leading-snug">
           {dayCount.toLocaleString()} days since the first message.<br />
-          Her & Him, still talking.
+          {p1} &amp; {p2}, still talking.
         </p>
       </div>
     </section>

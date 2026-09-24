@@ -1,11 +1,16 @@
 import { useMemo } from 'react';
-import { getCalendarHeat } from '../lib/stats';
+import { getCalendarHeat, formatDuration } from '../lib/stats';
 
 const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function CalendarHeat({ messages }) {
   const days = useMemo(() => getCalendarHeat(messages), [messages]);
   const maxCount = useMemo(() => Math.max(...days.map((d) => d.count), 1), [days]);
+
+  const duration = useMemo(() => {
+    if (!messages || messages.length === 0) return 'all time';
+    return formatDuration(messages[0]?.date, messages[messages.length - 1]?.date);
+  }, [messages]);
 
   // GitHub-style grid alignment: pad initial days of the first week so Sunday is row 0
   const paddedDays = useMemo(() => {
@@ -21,14 +26,14 @@ function CalendarHeat({ messages }) {
         aria-hidden="true"
         className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-navy/[0.03] text-[20vw] sm:text-[16vw] leading-none font-semibold"
       >
-        365
+        {days.length || 365}
       </div>
 
       <div className="relative z-10">
         <p className="font-sans text-navy/50 text-sm mb-4 sm:mb-8">every single day</p>
 
         <p className="font-serif text-navy text-3xl sm:text-5xl leading-snug max-w-2xl mb-10 sm:mb-14">
-          two years, one square per day.
+          {duration}, one square per day.
         </p>
 
         {/* Scrollable contribution graph container */}

@@ -1,10 +1,10 @@
 # areuagoodcouple ✨
 
-> **Turn your WhatsApp chats into a private, cinematic visual story.**
+> **Turn your WhatsApp & Telegram chats into a private, cinematic visual story.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-areuagoodcouple.vercel.app-ff85bb?style=for-the-badge&logo=vercel&logoColor=white)](https://areuagoodcouple.vercel.app)
 
-**areuagoodcouple** is a privacy-first WhatsApp chat analyzer and interactive visual album built for couples and close friends. Simply drop your exported `.txt` chat, and the app instantly transforms months or years of texts into a fluid, animated experience filled with milestones, heatmaps, response patterns, and cherished memories.
+**areuagoodcouple** is a privacy-first chat analyzer and interactive visual story built for couples and close friends. Supporting both **WhatsApp** (`.txt`) and **Telegram** (`result.json`) exports, simply drop your chat export file, map participant names to **Her & Him**, and the app instantly transforms months or years of messages into a fluid, animated experience filled with milestones, heatmaps, response patterns, and cherished memories.
 
 ---
 
@@ -19,13 +19,15 @@ Experience the app live in your browser:
 
 Your messages never leave your device.
 - **Zero Server Uploads**: No database, no backend server, and no cloud storage.
-- **Client-Side Parsing**: All file parsing, regex tokenization, and analytics occur purely inside your browser.
+- **Client-Side Parsing**: All file parsing, regex tokenization, JSON parsing, and analytics occur purely inside your browser.
 - **Web Worker Acceleration**: Searching and heavy computations run in background threads to keep the UI silky smooth at 60 FPS.
 
 ---
 
 ## ✨ Features & Highlights
 
+- **💬 Dual-Platform Support**: Auto-detects and seamlessly parses both **WhatsApp** (`.txt`) and **Telegram Desktop** (`result.json`) exports, handling message replies, forwarded messages, stickers, media, and reaction emojis.
+- **🏷️ Interactive Name Mapping**: Easily map chat handles to **Her & Him** on upload or anytime via the floating Settings modal.
 - **🎬 Cinematic Dark Atmosphere**: Ambient looping glow background video, frosted glass cards, and fluid GSAP scroll-triggered animations.
 - **📈 Milestones & Big Numbers**: Total messages exchanged, words typed, average daily pace, longest consecutive days talking, and your single busiest chat day.
 - **📅 Calendar Heatmap**: GitHub-style year-long contribution grid mapping out text intensity for every single day.

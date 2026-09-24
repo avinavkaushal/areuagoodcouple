@@ -198,14 +198,10 @@ function ActivityHeatmap({ messages }) {
                           className={`relative h-10 sm:h-12 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-center ${getIntensityClass(
                             count,
                             maxPeriodCount
-                          )} ${isPeak ? 'ring-2 ring-pink ring-offset-1 ring-offset-[#021A54]' : ''} ${
+                          )} ${isPeak ? 'ring-1.5 ring-pink shadow-[0_0_10px_rgba(255,133,187,0.4)]' : ''} ${
                             isHovered ? 'scale-105 shadow-xl brightness-125 z-10' : ''
                           }`}
-                        >
-                          {isPeak && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping pointer-events-none" />
-                          )}
-                        </div>
+                        />
                       );
                     })}
                   </div>
@@ -261,14 +257,10 @@ function ActivityHeatmap({ messages }) {
                             className={`relative h-6 sm:h-7 rounded border transition-all duration-150 cursor-pointer flex items-center justify-center ${getIntensityClass(
                               count,
                               maxHourCount
-                            )} ${isPeak ? 'ring-2 ring-pink ring-offset-1 ring-offset-[#021A54]' : ''} ${
+                            )} ${isPeak ? 'ring-1.5 ring-pink shadow-[0_0_10px_rgba(255,133,187,0.4)]' : ''} ${
                               isHovered ? 'scale-125 shadow-xl brightness-125 z-10' : ''
                             }`}
-                          >
-                            {isPeak && (
-                              <span className="w-1 h-1 rounded-full bg-white animate-ping pointer-events-none" />
-                            )}
-                          </div>
+                          />
                         );
                       })}
                     </div>
@@ -281,7 +273,7 @@ function ActivityHeatmap({ messages }) {
           {/* Simple Minimal Footer (Inspection Text & Scale) */}
           <div className="mt-5 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-sans text-cloud/60">
             <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-pink animate-pulse shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-pink shrink-0" />
               {hovered ? (
                 <span className="text-cloud">
                   <strong className="text-pink font-semibold">{hovered.title}</strong>: {hovered.count.toLocaleString()} messages

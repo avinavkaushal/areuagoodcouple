@@ -80,7 +80,7 @@ Your messages never leave your device.
 Clone the repository and install dependencies:
 
 ```bash
-git clone https://github.com/avinavkaushal/aruavu.git
+git clone https://github.com/avinavkaushal/areuagoodcouple.git
 cd aruavu
 npm install
 ```

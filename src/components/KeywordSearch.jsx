@@ -117,19 +117,19 @@ function KeywordSearch({ messages }) {
   };
 
   return (
-    <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-blush">
+    <section id="search" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
       <div
         aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-navy/[0.04] text-[24vw] sm:text-[18vw] leading-none font-semibold"
+        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[24vw] sm:text-[18vw] leading-none font-semibold"
       >
         ?
       </div>
 
       <div className="relative z-10">
-        <p className="font-sans text-navy/50 text-sm mb-4 sm:mb-8">a word, counted</p>
+        <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">a word, counted</p>
 
         <div className="max-w-2xl glass rounded-3xl p-6 sm:p-8">
-          <p className="font-serif text-navy text-3xl sm:text-5xl leading-snug">
+          <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug">
             how many times did we say{' '}
             <input
               type="text"
@@ -137,7 +137,7 @@ function KeywordSearch({ messages }) {
               onChange={handleInputChange}
               placeholder="sorry"
               style={{ width: `${Math.max(keyword.length, 5)}ch` }}
-              className="bg-transparent border-b-2 border-navy/30 focus:border-pink outline-none text-pink placeholder:text-navy/20 font-serif italic px-1"
+              className="bg-transparent border-b-2 border-white/30 focus:border-pink outline-none text-pink placeholder:text-white/20 font-serif italic px-1"
             />
             {' '}?
             {isSearching && (
@@ -146,7 +146,7 @@ function KeywordSearch({ messages }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                 </svg>
-                <span className="text-xs font-sans text-navy/40 font-medium">searching...</span>
+                <span className="text-xs font-sans text-cloud/40 font-medium">searching...</span>
               </span>
             )}
           </p>
@@ -155,10 +155,10 @@ function KeywordSearch({ messages }) {
         {stats && (
           <div ref={resultRef} className="mt-12 sm:mt-16 max-w-2xl">
             <div className="flex items-baseline gap-4">
-              <span className="font-serif font-semibold text-navy text-6xl sm:text-7xl">
+              <span className="font-serif font-semibold text-pink text-6xl sm:text-7xl">
                 {stats.count.toLocaleString()}
               </span>
-              <span className="font-sans text-navy/60 text-sm">
+              <span className="font-sans text-cloud/70 text-sm">
                 times{stats.count > 0 && stats.topHour !== null ? `, mostly around ${hourLabel(stats.topHour)}` : ''}
                 {stats.avgGapDays ? `, every ${stats.avgGapDays.toFixed(1)} days on average` : ''}
               </span>
@@ -167,7 +167,7 @@ function KeywordSearch({ messages }) {
             {/* timeline: dot per occurrence, sampled to prevent DOM freezes */}
             {stats.count > 0 && span > 0 && stats.timelineTimestamps?.length > 0 && (
               <div className="relative mt-8 h-8">
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-navy/15" />
+                <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
                 {stats.timelineTimestamps.map((ts, i) => {
                   const pct = Math.max(0, Math.min(100, ((ts - firstTime) / span) * 100));
                   return (

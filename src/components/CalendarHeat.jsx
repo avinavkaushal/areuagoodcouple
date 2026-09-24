@@ -21,18 +21,18 @@ function CalendarHeat({ messages }) {
   }, [days]);
 
   return (
-    <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-cloud">
+    <section id="calendar" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
       <div
         aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-navy/[0.03] text-[20vw] sm:text-[16vw] leading-none font-semibold"
+        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[20vw] sm:text-[16vw] leading-none font-semibold"
       >
         {days.length || 365}
       </div>
 
       <div className="relative z-10">
-        <p className="font-sans text-navy/50 text-sm mb-4 sm:mb-8">every single day</p>
+        <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">every single day</p>
 
-        <p className="font-serif text-navy text-3xl sm:text-5xl leading-snug max-w-2xl mb-10 sm:mb-14">
+        <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug max-w-2xl mb-10 sm:mb-14">
           {duration}, one square per day.
         </p>
 
@@ -40,7 +40,7 @@ function CalendarHeat({ messages }) {
         <div className="overflow-x-auto pb-4 pt-1">
           <div className="inline-flex gap-3 items-center">
             {/* Day of week labels */}
-            <div className="grid grid-rows-7 gap-[3px] text-[10px] font-sans text-navy/40 pr-1 select-none">
+            <div className="grid grid-rows-7 gap-[3px] text-[10px] font-sans text-cloud/40 pr-1 select-none">
               {DAY_LABELS.map((label, idx) => (
                 <div key={idx} className="h-3 w-3 flex items-center justify-center">
                   {idx % 2 === 1 ? label : ''}
@@ -55,7 +55,7 @@ function CalendarHeat({ messages }) {
                   return <div key={`pad-${idx}`} className="w-3 h-3" />;
                 }
                 const isZero = item.count === 0;
-                const opacity = isZero ? 0.06 : 0.25 + (item.count / maxCount) * 0.75;
+                const opacity = isZero ? 1 : 0.35 + (item.count / maxCount) * 0.65;
                 const dateStr = item.date.toLocaleDateString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -70,7 +70,7 @@ function CalendarHeat({ messages }) {
                       opacity,
                     }}
                     className={`w-3 h-3 rounded-[2px] transition-transform hover:scale-150 hover:z-20 cursor-pointer ${
-                      isZero ? 'bg-navy' : 'bg-pink'
+                      isZero ? 'bg-white/10' : 'bg-pink'
                     }`}
                   />
                 );
@@ -79,13 +79,13 @@ function CalendarHeat({ messages }) {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 mt-4 text-xs font-sans text-navy/40">
+        <div className="flex items-center gap-2 mt-4 text-xs font-sans text-cloud/50">
           <span>Less</span>
           <div className="flex gap-1 items-center">
-            <div className="w-2.5 h-2.5 rounded-[2px] bg-navy opacity-[0.06]" />
-            <div className="w-2.5 h-2.5 rounded-[2px] bg-pink opacity-[0.3]" />
-            <div className="w-2.5 h-2.5 rounded-[2px] bg-pink opacity-[0.6]" />
-            <div className="w-2.5 h-2.5 rounded-[2px] bg-pink opacity-[0.9]" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-white/10" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-pink opacity-[0.35]" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-pink opacity-[0.65]" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-pink opacity-[1]" />
           </div>
           <span>More messages</span>
         </div>

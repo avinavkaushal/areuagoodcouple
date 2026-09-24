@@ -39,7 +39,7 @@ function Outro({ messages, senders }) {
   return (
     <section
       ref={sectionRef}
-      className="relative overflow-hidden flex flex-col items-center justify-center bg-navy px-8 py-24 sm:py-32 text-center"
+      className="relative overflow-hidden flex flex-col items-center justify-center bg-midnight px-8 py-24 sm:py-32 text-center"
     >
       <div
         aria-hidden="true"

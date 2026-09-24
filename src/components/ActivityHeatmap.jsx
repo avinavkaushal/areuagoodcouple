@@ -8,18 +8,18 @@ function ActivityHeatmap({ messages }) {
   const max = Math.max(...grid.flat(), 1);
 
   return (
-    <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-blush">
+    <section id="activity" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
       <div
         aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-navy/[0.04] text-[20vw] sm:text-[16vw] leading-none font-semibold"
+        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[20vw] sm:text-[16vw] leading-none font-semibold"
       >
         24/7
       </div>
 
       <div className="relative z-10">
-        <p className="font-sans text-navy/50 text-sm mb-4 sm:mb-8">our loudest hour</p>
+        <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">our loudest hour</p>
 
-        <p className="font-serif text-navy text-3xl sm:text-5xl leading-snug max-w-2xl mb-12 sm:mb-16">
+        <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug max-w-2xl mb-12 sm:mb-16">
           {peak.dayName}s around {peak.hourLabel}, we talk the most.
         </p>
 
@@ -35,7 +35,7 @@ function ActivityHeatmap({ messages }) {
             ))}
           </div>
         </div>
-        <p className="font-sans text-navy/40 text-xs mt-4">each row a day · each dot an hour, midnight to 11pm</p>
+        <p className="font-sans text-cloud/40 text-xs mt-4">each row a day · each dot an hour, midnight to 11pm</p>
       </div>
     </section>
   );
@@ -44,14 +44,14 @@ function ActivityHeatmap({ messages }) {
 function FragmentRow({ letter, row, max }) {
   return (
     <>
-      <div className="font-sans text-navy/40 text-xs flex items-center">{letter}</div>
+      <div className="font-sans text-cloud/40 text-xs flex items-center">{letter}</div>
       {row.map((count, h) => {
         const size = count ? 4 + (count / max) * 10 : 2;
         return (
           <div key={h} className="w-3.5 h-3.5 flex items-center justify-center">
             <div
-              className="rounded-full bg-pink"
-              style={{ width: size, height: size, opacity: count ? 0.35 + (count / max) * 0.65 : 0.15 }}
+              className={`rounded-full ${count ? 'bg-pink' : 'bg-white/15'}`}
+              style={{ width: size, height: size, opacity: count ? 0.4 + (count / max) * 0.6 : 1 }}
             />
           </div>
         );

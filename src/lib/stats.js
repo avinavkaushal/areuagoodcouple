@@ -142,6 +142,38 @@ export function getHeatmapData(messages) {
 
 const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+// Reusable streak helper: longest run of consecutive calendar days where matchFn(m) is true
+export function getLongestStreak(messages, matchFn) {
+  if (!messages || messages.length === 0) return 0;
+  const dayTimestamps = new Set();
+
+  for (let i = 0; i < messages.length; i++) {
+    const m = messages[i];
+    if (!matchFn || matchFn(m)) {
+      const d = new Date(m.date.getFullYear(), m.date.getMonth(), m.date.getDate()).getTime();
+      dayTimestamps.add(d);
+    }
+  }
+
+  if (dayTimestamps.size === 0) return 0;
+
+  const sortedDays = Array.from(dayTimestamps).sort((a, b) => a - b);
+  let longest = 1;
+  let current = 1;
+
+  for (let i = 1; i < sortedDays.length; i++) {
+    const diff = Math.round((sortedDays[i] - sortedDays[i - 1]) / (1000 * 60 * 60 * 24));
+    if (diff === 1) {
+      current++;
+      if (current > longest) longest = current;
+    } else {
+      current = 1;
+    }
+  }
+
+  return longest;
+}
+
 export function getHighlights(messages) {
   if (!messages || messages.length === 0) {
     return {
@@ -168,23 +200,13 @@ export function getHighlights(messages) {
     .map(d => new Date(d))
     .sort((a, b) => a - b);
 
-  let longestStreak = 1, curStreak = 1;
-  for (let i = 1; i < uniqueDaysSorted.length; i++) {
-    const diff = (uniqueDaysSorted[i] - uniqueDaysSorted[i - 1]) / (1000 * 60 * 60 * 24);
-    if (Math.round(diff) === 1) {
-      curStreak++;
-      longestStreak = Math.max(longestStreak, curStreak);
-    } else {
-      curStreak = 1;
-    }
-  }
-
   let longestGapDays = 0;
   for (let i = 1; i < uniqueDaysSorted.length; i++) {
     const diff = (uniqueDaysSorted[i] - uniqueDaysSorted[i - 1]) / (1000 * 60 * 60 * 24);
     longestGapDays = Math.max(longestGapDays, diff);
   }
 
+  const longestStreak = getLongestStreak(messages);
   const [year, month] = busiestMonthEntry ? busiestMonthEntry[0].split('-').map(Number) : [null, null];
 
   return {
@@ -205,8 +227,7 @@ const STOPWORDS = new Set([
   'nahi','kya','to','me','my','your','are','was','be','but','so','just','not','de','do','media','omitted',
   'voice','deleted','message','tum','tu','have','rhi','hum','ok','get','we','nahi','aur','nhi',
   'mein','don','can','tho','will','mujhe','tumhe','waha','kuch','kya','hogi','kar','liye',
-  'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera', 'https',
-  'http', 'ker', 'bro', 'koi', 
+  'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera',
 ]);
 
 export function getWordCloudData(messages, topN = 40) {
@@ -400,5 +421,327 @@ export function getVerbosityStats(messages, senders) {
   return {
     p1: { name: p1, avg: avg1 },
     p2: { name: p2, avg: avg2 },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// FEATURE BATCH 2 STAT COMPUTATIONS
+// ---------------------------------------------------------------------------
+
+// Format milliseconds into human-friendly duration
+export function formatResponseTime(ms) {
+  if (ms == null || isNaN(ms) || ms < 0) return '—';
+  const mins = Math.round(ms / 60000);
+  if (mins < 1) return '< 1 min';
+  if (mins < 60) return `~${mins} min`;
+  const hrs = Math.floor(mins / 60);
+  const remMins = mins % 60;
+  if (hrs < 24) {
+    return remMins > 0 ? `~${hrs}h ${remMins}m` : `~${hrs}h`;
+  }
+  const days = Math.round(mins / 1440);
+  return `~${days} day${days === 1 ? '' : 's'}`;
+}
+
+// 1. Response Time
+export function getResponseTimeStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const data = {
+    [p1]: { sumMs: 0, count: 0, longestGapMs: 0, longestGapDate: null },
+    [p2]: { sumMs: 0, count: 0, longestGapMs: 0, longestGapDate: null },
+  };
+
+  const MAX_REPLY_GAP = 12 * 60 * 60 * 1000; // 12 hours
+
+  if (messages && messages.length > 1) {
+    for (let i = 1; i < messages.length; i++) {
+      const prev = messages[i - 1];
+      const curr = messages[i];
+      if (curr.sender !== prev.sender) {
+        const replier = curr.sender;
+        if (data[replier]) {
+          const gapMs = Math.max(0, curr.date.getTime() - prev.date.getTime());
+          if (gapMs <= MAX_REPLY_GAP) {
+            data[replier].sumMs += gapMs;
+            data[replier].count++;
+          }
+          if (gapMs > data[replier].longestGapMs) {
+            data[replier].longestGapMs = gapMs;
+            data[replier].longestGapDate = curr.date;
+          }
+        }
+      }
+    }
+  }
+
+  const p1Avg = data[p1].count > 0 ? Math.round(data[p1].sumMs / data[p1].count) : 0;
+  const p2Avg = data[p2].count > 0 ? Math.round(data[p2].sumMs / data[p2].count) : 0;
+
+  return {
+    [p1]: {
+      name: p1,
+      avgReplyMs: p1Avg,
+      formattedAvg: formatResponseTime(p1Avg),
+      longestGapMs: data[p1].longestGapMs,
+      formattedLongestGap: formatResponseTime(data[p1].longestGapMs),
+      longestGapDate: data[p1].longestGapDate,
+      replyCount: data[p1].count,
+    },
+    [p2]: {
+      name: p2,
+      avgReplyMs: p2Avg,
+      formattedAvg: formatResponseTime(p2Avg),
+      longestGapMs: data[p2].longestGapMs,
+      formattedLongestGap: formatResponseTime(data[p2].longestGapMs),
+      longestGapDate: data[p2].longestGapDate,
+      replyCount: data[p2].count,
+    },
+    order: [p1, p2],
+    fasterSender: p1Avg > 0 && p2Avg > 0 ? (p1Avg <= p2Avg ? p1 : p2) : (p1Avg > 0 ? p1 : p2),
+  };
+}
+
+// 2. Milestone Counter
+export function getMilestoneStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const totalMessages = messages?.length || 0;
+  let totalWords = 0;
+  const msgsBySender = { [p1]: 0, [p2]: 0 };
+  const wordsBySender = { [p1]: 0, [p2]: 0 };
+  const dayCounts = {};
+
+  if (messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      const words = m.text.trim().split(/\s+/).filter(Boolean).length;
+      totalWords += words;
+      if (msgsBySender[m.sender] !== undefined) {
+        msgsBySender[m.sender]++;
+        wordsBySender[m.sender] += words;
+      }
+      const dKey = m.date.toDateString();
+      dayCounts[dKey] = (dayCounts[dKey] || 0) + 1;
+    }
+  }
+
+  const firstDate = messages?.[0]?.date;
+  const lastDate = messages?.[messages?.length - 1]?.date;
+  const daySpan = firstDate && lastDate
+    ? Math.max(1, Math.round((new Date(lastDate) - new Date(firstDate)) / (1000 * 60 * 60 * 24)))
+    : 1;
+
+  const avgMessagesPerDay = totalMessages > 0 ? +(totalMessages / daySpan).toFixed(1) : 0;
+
+  const busiestDayEntry = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0];
+  const busiestDay = busiestDayEntry
+    ? {
+        date: new Date(busiestDayEntry[0]).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }),
+        count: busiestDayEntry[1],
+      }
+    : null;
+
+  const longestDailyStreak = getLongestStreak(messages);
+
+  return {
+    totalMessages,
+    totalWords,
+    daySpan,
+    avgMessagesPerDay,
+    busiestDay,
+    longestDailyStreak,
+    senders: [p1, p2],
+    p1: { name: p1, messages: msgsBySender[p1], words: wordsBySender[p1] },
+    p2: { name: p2, messages: msgsBySender[p2], words: wordsBySender[p2] },
+  };
+}
+
+// 3. Love Word Tracker
+export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby", "babe", "cutie", "❤️", "😘"];
+
+export function getLoveWordStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const wordCounts = {};
+  LOVE_WORDS.forEach(w => {
+    wordCounts[w] = { [p1]: 0, [p2]: 0, total: 0 };
+  });
+
+  const totals = { [p1]: 0, [p2]: 0, overall: 0 };
+  const monthlyCounts = {};
+
+  if (messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      const textLower = m.text.toLowerCase();
+      let matchedAnyInMsg = false;
+
+      for (let j = 0; j < LOVE_WORDS.length; j++) {
+        const lw = LOVE_WORDS[j];
+        const lwLower = lw.toLowerCase();
+        let pos = 0;
+        let count = 0;
+        while ((pos = textLower.indexOf(lwLower, pos)) !== -1) {
+          count++;
+          pos += lwLower.length;
+        }
+
+        if (count > 0) {
+          matchedAnyInMsg = true;
+          if (wordCounts[lw][m.sender] !== undefined) {
+            wordCounts[lw][m.sender] += count;
+          }
+          wordCounts[lw].total += count;
+          if (totals[m.sender] !== undefined) {
+            totals[m.sender] += count;
+          }
+          totals.overall += count;
+        }
+      }
+
+      if (matchedAnyInMsg) {
+        const mKey = `${m.date.getFullYear()}-${String(m.date.getMonth() + 1).padStart(2, '0')}`;
+        monthlyCounts[mKey] = (monthlyCounts[mKey] || 0) + 1;
+      }
+    }
+  }
+
+  const leaderboard = Object.entries(wordCounts)
+    .map(([word, counts]) => ({
+      word,
+      total: counts.total,
+      [p1]: counts[p1],
+      [p2]: counts[p2],
+    }))
+    .filter(item => item.total > 0)
+    .sort((a, b) => b.total - a.total);
+
+  const topWord = leaderboard[0] || null;
+  const loveComparison = wordCounts['love'] || { [p1]: 0, [p2]: 0, total: 0 };
+  const whoSaysLoveMore = loveComparison[p1] >= loveComparison[p2] ? p1 : p2;
+  const whoSaysMoreOverall = totals[p1] >= totals[p2] ? p1 : p2;
+
+  const monthlyTrend = Object.entries(monthlyCounts)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, count]) => {
+      const [year, month] = key.split('-');
+      const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+      return {
+        key,
+        label: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        count,
+      };
+    });
+
+  return {
+    senders: [p1, p2],
+    totals,
+    leaderboard,
+    topWord,
+    whoSaysLoveMore,
+    whoSaysMoreOverall,
+    loveComparison,
+    monthlyTrend,
+  };
+}
+
+// 4. Random Memory Picker
+export function getRandomMemory(messages) {
+  if (!messages || messages.length === 0) return null;
+
+  const candidates = [];
+  for (let i = 0; i < messages.length; i++) {
+    const t = messages[i].text.trim();
+    if (t.length > 5 && !t.includes('<Media omitted>') && !t.includes('omitted>')) {
+      candidates.push(i);
+    }
+  }
+
+  if (candidates.length === 0) return null;
+
+  const randIdx = candidates[Math.floor(Math.random() * candidates.length)];
+  const primaryMsg = messages[randIdx];
+
+  const windowMsgs = [primaryMsg];
+  if (randIdx > 0) {
+    const prev = messages[randIdx - 1];
+    if (
+      !prev.text.includes('omitted>') &&
+      Math.abs(primaryMsg.date.getTime() - prev.date.getTime()) < 15 * 60 * 1000
+    ) {
+      windowMsgs.unshift(prev);
+    }
+  }
+  if (randIdx < messages.length - 1 && windowMsgs.length < 3) {
+    const next = messages[randIdx + 1];
+    if (
+      !next.text.includes('omitted>') &&
+      Math.abs(next.date.getTime() - primaryMsg.date.getTime()) < 15 * 60 * 1000
+    ) {
+      windowMsgs.push(next);
+    }
+  }
+
+  return {
+    id: `${randIdx}-${Date.now()}-${Math.random()}`,
+    date: primaryMsg.date.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    time: primaryMsg.date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }),
+    messages: windowMsgs,
+    primarySender: primaryMsg.sender,
+  };
+}
+
+// 5. Call-out Streak
+export const MORNING_PHRASES = ["good morning", "gm", "morning!"];
+export const NIGHT_PHRASES = ["good night", "gn", "night night", "nite"];
+
+function matchesAnyPhrase(text, phrases) {
+  const lower = text.toLowerCase();
+  for (let i = 0; i < phrases.length; i++) {
+    if (lower.includes(phrases[i])) return true;
+  }
+  return false;
+}
+
+export function getCalloutStats(messages, senders) {
+  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const morningCounts = { [p1]: 0, [p2]: 0, total: 0 };
+  const nightCounts = { [p1]: 0, [p2]: 0, total: 0 };
+
+  if (messages) {
+    for (let i = 0; i < messages.length; i++) {
+      const m = messages[i];
+      if (matchesAnyPhrase(m.text, MORNING_PHRASES)) {
+        if (morningCounts[m.sender] !== undefined) morningCounts[m.sender]++;
+        morningCounts.total++;
+      }
+      if (matchesAnyPhrase(m.text, NIGHT_PHRASES)) {
+        if (nightCounts[m.sender] !== undefined) nightCounts[m.sender]++;
+        nightCounts.total++;
+      }
+    }
+  }
+
+  const morningLeader = morningCounts[p1] >= morningCounts[p2] ? p1 : p2;
+  const nightLeader = nightCounts[p1] >= nightCounts[p2] ? p1 : p2;
+
+  const longestMorningStreak = getLongestStreak(messages, m => matchesAnyPhrase(m.text, MORNING_PHRASES));
+  const longestNightStreak = getLongestStreak(messages, m => matchesAnyPhrase(m.text, NIGHT_PHRASES));
+
+  return {
+    senders: [p1, p2],
+    morning: {
+      counts: morningCounts,
+      leader: morningLeader,
+      longestStreak: longestMorningStreak,
+    },
+    night: {
+      counts: nightCounts,
+      leader: nightLeader,
+      longestStreak: longestNightStreak,
+    },
   };
 }

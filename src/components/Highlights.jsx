@@ -18,16 +18,16 @@ function Highlights({ messages, senders }) {
   ];
 
   return (
-    <section className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-blush">
+    <section id="highlights" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-navy">
       <div
         aria-hidden="true"
-        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-navy/[0.04] text-[24vw] sm:text-[18vw] leading-none"
+        className="absolute -right-4 top-1/2 -translate-y-1/2 select-none pointer-events-none font-serif text-white/[0.04] text-[24vw] sm:text-[18vw] leading-none"
       >
         ★
       </div>
 
       <div className="relative z-10">
-        <p className="font-sans text-navy/50 text-sm mb-8 sm:mb-12">moments worth marking</p>
+        <p className="font-sans text-blush/70 text-sm mb-8 sm:mb-12">moments worth marking</p>
 
         <div className="max-w-2xl space-y-4">
           {rows.map((r) => (
@@ -35,10 +35,10 @@ function Highlights({ messages, senders }) {
               key={r.label}
               className="glass rounded-2xl p-6 flex items-baseline justify-between gap-6"
             >
-              <p className="font-sans text-navy/70 text-sm sm:text-base max-w-[50%]">{r.label}</p>
+              <p className="font-sans text-cloud/80 text-sm sm:text-base max-w-[50%]">{r.label}</p>
               <div className="text-right">
-                <span className={`font-serif font-semibold text-navy ${r.size}`}>{r.value}</span>
-                {r.detail && <p className="font-sans text-navy/50 text-xs mt-1">{r.detail}</p>}
+                <span className={`font-serif font-semibold text-pink ${r.size}`}>{r.value}</span>
+                {r.detail && <p className="font-sans text-cloud/50 text-xs mt-1">{r.detail}</p>}
               </div>
             </div>
           ))}

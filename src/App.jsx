@@ -309,7 +309,7 @@ function App() {
 
                 {/* Primary Action Button */}
                 <div className="w-full flex flex-col items-center gap-3">
-                  <GlassButton text="Confirm &amp; Explore Story ✨" onClick={handleConfirmPending} />
+                  <GlassButton text="Confirm &amp; Explore ✨" onClick={handleConfirmPending} />
 
                   <button
                     type="button"

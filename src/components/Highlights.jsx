@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { getHighlights, getLateNightStats, getVerbosityStats } from '../lib/stats';
 
 function Highlights({ messages, senders }) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
 
   const h = useMemo(() => getHighlights(messages), [messages]);
   const late = useMemo(() => getLateNightStats(messages, senders), [messages, senders]);

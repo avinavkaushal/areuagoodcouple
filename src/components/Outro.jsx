@@ -6,7 +6,7 @@ function Outro({ messages, senders }) {
   const textRef = useRef(null);
   const sectionRef = useRef(null);
 
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const first = messages?.[0]?.date;
   const last = messages?.[messages?.length - 1]?.date;
   const dayCount = first && last

@@ -1,16 +1,99 @@
-# React + Vite
+# areuagoodcouple ✨
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+> **Turn your WhatsApp chats into a private, cinematic visual story.**
 
-Currently, two official plugins are available:
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-areuagoodcouple.vercel.app-ff85bb?style=for-the-badge&logo=vercel&logoColor=white)](https://areuagoodcouple.vercel.app)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+**areuagoodcouple** is a privacy-first WhatsApp chat analyzer and interactive visual album built for couples and close friends. Simply drop your exported `.txt` chat, and the app instantly transforms months or years of texts into a fluid, animated experience filled with milestones, heatmaps, response patterns, and cherished memories.
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 🌐 Live Application
 
-## Expanding the ESLint configuration
+Experience the app live in your browser:
+👉 **[https://areuagoodcouple.vercel.app](https://areuagoodcouple.vercel.app)**
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+---
+
+## 🔒 100% Private & In-Browser
+
+Your messages never leave your device.
+- **Zero Server Uploads**: No database, no backend server, and no cloud storage.
+- **Client-Side Parsing**: All file parsing, regex tokenization, and analytics occur purely inside your browser.
+- **Web Worker Acceleration**: Searching and heavy computations run in background threads to keep the UI silky smooth at 60 FPS.
+
+---
+
+## ✨ Features & Highlights
+
+- **🎬 Cinematic Dark Atmosphere**: Ambient looping glow background video, frosted glass cards, and fluid GSAP scroll-triggered animations.
+- **📈 Milestones & Big Numbers**: Total messages exchanged, words typed, average daily pace, longest consecutive days talking, and your single busiest chat day.
+- **📅 Calendar Heatmap**: GitHub-style year-long contribution grid mapping out text intensity for every single day.
+- **⚡ The Waiting Game**: Calculates average reply latency for both participants and surfaces the longest recorded wait before replying.
+- **🌅 Morning & Night Streaks**: Discovers who says "Good morning" and "Good night" first and tracks consecutive streak records.
+- **💖 Terms of Endearment**: An affectionate leaderboard tracking pet names, sweet words, and love terms over time.
+- **🕐 24/7 Activity Heatmap**: Hour-by-hour punchcard visualizing your loudest chat hours across Monday through Sunday.
+- **🔍 Word Frequency & Timeline**: Type any word to see how many times it was spoken along with an occurrence timeline.
+- **☺ Emoji Split**: Side-by-side comparison of your top go-to emojis.
+- **☁️ Word Cloud**: Visual cloud of your most frequently typed words.
+- **🎲 Random Memory Bookmark**: Click to roll the dice and freeze frame into an authentic historical chat exchange.
+- **📜 Longest Monologue**: Pinpoints the longest single message typed in one breath.
+- **🧭 Dynamic Navigation Bar**: Smooth floating quick-jump bar with scroll-spy tracking.
+
+---
+
+## 📱 How to Export Your WhatsApp Chat
+
+1. Open WhatsApp on your phone (iOS or Android).
+2. Open the 1-on-1 chat you want to analyze.
+3. Tap **More (⋮)** (or the contact's name at the top on iOS).
+4. Tap **Export Chat**.
+5. Select **Without Media** *(important — this creates a lightweight `.txt` export)*.
+6. Open **[areuagoodcouple.vercel.app](https://areuagoodcouple.vercel.app)** and drop the `.txt` file onto the upload zone!
+
+---
+
+## 🛠 Tech Stack
+
+- **Framework**: [React 19](https://react.dev/) + [Vite 8](https://vitejs.dev/)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com/)
+- **Animations**: [GSAP 3](https://greensock.com/gsap/) with [ScrollTrigger](https://greensock.com/scrolltrigger/)
+- **Processing**: Native Web Workers (`searchWorker.js`)
+- **Typography**: [Fraunces](https://fonts.google.com/specimen/Fraunces) (Serif) & [Manrope](https://fonts.google.com/specimen/Manrope) (Sans)
+- **Deployment**: [Vercel](https://vercel.com)
+
+---
+
+## 🚀 Local Development
+
+Clone the repository and install dependencies:
+
+```bash
+git clone https://github.com/avinavkaushal/aruavu.git
+cd aruavu
+npm install
+```
+
+Start the Vite development server:
+
+```bash
+npm run dev
+```
+
+Build for production:
+
+```bash
+npm run build
+```
+
+Run linter:
+
+```bash
+npm run lint
+```
+
+---
+
+## 📄 License
+
+MIT © [Avinav Kaushal](https://github.com/avinavkaushal)

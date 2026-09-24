@@ -18,7 +18,7 @@ function Hero({ messages, senders }) {
     return false;
   });
 
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const word = `${p1}${p2}`;
 
   const firstDate = messages?.[0]?.date;

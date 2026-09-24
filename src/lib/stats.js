@@ -48,7 +48,7 @@ export function getEmojiStats(messages) {
 }
 
 export function getEmojiComparison(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const order = [p1, p2];
   const bySender = { [p1]: {}, [p2]: {} };
   const total = {};
@@ -244,7 +244,7 @@ export function getWordCloudData(messages, topN = 40) {
 }
 
 export function getMediaStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   let count1 = 0;
   let count2 = 0;
   (messages || []).forEach(m => {
@@ -311,7 +311,7 @@ export function getCalendarHeat(messages) {
 }
 
 export function getInitiatorStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const firstMsgByDay = {}; // { YYYY-MM-DD: sender }
   (messages || []).forEach(m => {
     const key = `${m.date.getFullYear()}-${String(m.date.getMonth() + 1).padStart(2, '0')}-${String(m.date.getDate()).padStart(2, '0')}`;
@@ -338,7 +338,7 @@ export function getInitiatorStats(messages, senders) {
 }
 
 export function getLongestMessage(messages, senders) {
-  const defaultSender = senders && senders[0] ? senders[0] : 'Aru';
+  const defaultSender = senders && senders[0] ? senders[0] : 'unknown';
   if (!messages || messages.length === 0) {
     return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
@@ -370,7 +370,7 @@ export function getLongestMessage(messages, senders) {
 }
 
 export function getLateNightStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   let count1Total = 0;
   let count2Total = 0;
   let count1Late = 0;
@@ -398,7 +398,7 @@ export function getLateNightStats(messages, senders) {
 }
 
 export function getVerbosityStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   let words1 = 0;
   let msgs1 = 0;
   let words2 = 0;
@@ -445,7 +445,7 @@ export function formatResponseTime(ms) {
 
 // 1. Response Time
 export function getResponseTimeStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const data = {
     [p1]: { sumMs: 0, count: 0, longestGapMs: 0, longestGapDate: null },
     [p2]: { sumMs: 0, count: 0, longestGapMs: 0, longestGapDate: null },
@@ -503,7 +503,7 @@ export function getResponseTimeStats(messages, senders) {
 
 // 2. Milestone Counter
 export function getMilestoneStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const totalMessages = messages?.length || 0;
   let totalWords = 0;
   const msgsBySender = { [p1]: 0, [p2]: 0 };
@@ -559,7 +559,7 @@ export function getMilestoneStats(messages, senders) {
 export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby", "babe", "cutie", "❤️", "😘"];
 
 export function getLoveWordStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const wordCounts = {};
   LOVE_WORDS.forEach(w => {
     wordCounts[w] = { [p1]: 0, [p2]: 0, total: 0 };
@@ -707,7 +707,7 @@ function matchesAnyPhrase(text, phrases) {
 }
 
 export function getCalloutStats(messages, senders) {
-  const [p1 = 'Aru', p2 = 'Avu'] = senders && senders.length === 2 ? senders : ['Aru', 'Avu'];
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const morningCounts = { [p1]: 0, [p2]: 0, total: 0 };
   const nightCounts = { [p1]: 0, [p2]: 0, total: 0 };
 

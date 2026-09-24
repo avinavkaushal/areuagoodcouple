@@ -489,7 +489,13 @@ function App() {
         onResetChat={handleResetChat}
       />
 
-      <Hero messages={messages} senders={senders} />
+      <Hero
+        messages={messages}
+        senders={senders}
+        herName={currentHerSender}
+        himName={currentHimSender}
+        rawSenders={rawSenders}
+      />
       <Milestones messages={messages} senders={senders} />
       <CalendarHeat messages={messages} senders={senders} />
       <Highlights messages={messages} senders={senders} />

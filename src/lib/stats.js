@@ -245,10 +245,10 @@ const STOPWORDS = new Set([
   'the','a','an','is','to','and','of','in','it','you','i','for','on','with','this','that',
   'hai','ho','ka','ki','ke','h','na','se','ko','bhi','toh','hi','ye','main','tha','thi',
   'nahi','kya','to','me','my','your','are','was','be','but','so','just','not','de','do','media','omitted',
-  'voice','deleted','message','tum','tu','have','rhi','hum','ok','get','we','nahi','aur','nhi',
+  'voice','deleted','message','tum','tu','have','rhi','hum','get','we','nahi','aur','nhi',
   'mein','don','can','tho','will','mujhe','tumhe','waha','kuch','kya','hogi','kar','liye',
   'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera', "http", 
-  "link","https", 
+  "link","https", 'sent', 'attachment', 'reacted', 'link', 
 ]);
 
 export function getWordCloudData(messages, topN = 40) {
@@ -266,6 +266,18 @@ export function getWordCloudData(messages, topN = 40) {
     .map(([text, value]) => ({ text, value }));
 }
 
+export function isMediaMessage(m) {
+  if (!m) return false;
+  return (
+    m.type === 'media' ||
+    m.type === 'sticker' ||
+    m.type === 'photo' ||
+    m.type === 'video' ||
+    m.type === 'reel_share' ||
+    Boolean(m.text && (m.text.includes('<Media omitted>') || m.text.includes('omitted>')))
+  );
+}
+
 export function getMediaStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   let count1 = 0;
@@ -273,8 +285,7 @@ export function getMediaStats(messages, senders) {
   const validMessages = getNonSystemMessages(messages);
 
   validMessages.forEach((m) => {
-    const isMedia = m.type === 'media' || m.type === 'sticker' || (m.text && (m.text.includes('<Media omitted>') || m.text.includes('omitted>')));
-    if (isMedia) {
+    if (isMediaMessage(m)) {
       if (m.sender === p1) count1++;
       else if (m.sender === p2) count2++;
     }
@@ -291,7 +302,7 @@ export function getOverviewStats(messages) {
   const totalMessages = validMessages.length;
   const totalWords = validMessages.reduce((sum, m) => sum + (m.text || '').trim().split(/\s+/).filter(Boolean).length, 0);
   const uniqueDays = new Set(validMessages.map((m) => getMsgDate(m).toDateString())).size;
-  const totalMedia = validMessages.filter((m) => m.type === 'media' || m.type === 'sticker' || (m.text && (m.text.includes('<Media omitted>') || m.text.includes('omitted>')))).length;
+  const totalMedia = validMessages.filter(isMediaMessage).length;
   const firstDate = getMsgDate(validMessages[0]);
   const lastDate = getMsgDate(validMessages[validMessages.length - 1]);
   return { totalMessages, totalWords, uniqueDays, totalMedia, firstDate, lastDate };
@@ -371,7 +382,7 @@ export function getInitiatorStats(messages, senders) {
 
 export function getLongestMessage(messages, senders) {
   const defaultSender = senders && senders[0] ? senders[0] : 'unknown';
-  const validMessages = getNonSystemMessages(messages).filter((m) => m.type !== 'media' && m.type !== 'sticker');
+  const validMessages = getNonSystemMessages(messages).filter((m) => !isMediaMessage(m));
   if (validMessages.length === 0) {
     return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
@@ -438,7 +449,7 @@ export function getVerbosityStats(messages, senders) {
   let msgs1 = 0;
   let words2 = 0;
   let msgs2 = 0;
-  const validMessages = getNonSystemMessages(messages).filter((m) => m.type !== 'media' && m.type !== 'sticker');
+  const validMessages = getNonSystemMessages(messages).filter((m) => !isMediaMessage(m));
 
   validMessages.forEach((m) => {
     const words = (m.text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -784,5 +795,674 @@ export function getCalloutStats(messages, senders) {
       leader: nightLeader,
       longestStreak: longestNightStreak,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// INSTAGRAM REEL & MEDIA BREAKDOWN STATS
+// ---------------------------------------------------------------------------
+
+/**
+ * Calculates Reel statistics:
+ * 1. Reel count per person and comparison
+ * 2. Ping-pong streak: longest alternating streak between Aru & Avu
+ * 3. Most active reel month and day
+ *
+ * @param {ChatMessage[]} messages
+ * @param {string[]} senders
+ */
+export function getReelStats(messages, senders) {
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
+  const validMessages = getNonSystemMessages(messages);
+  const reelMessages = validMessages.filter((m) => m.type === 'reel_share');
+
+  // 1. Reel count per person
+  let count1 = 0;
+  let count2 = 0;
+  const monthlyCounts = {};
+  const dailyCounts = {};
+
+  reelMessages.forEach((m) => {
+    if (m.sender === p1) count1++;
+    else if (m.sender === p2) count2++;
+
+    const d = getMsgDate(m);
+    const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const dKey = d.toDateString();
+
+    monthlyCounts[mKey] = (monthlyCounts[mKey] || 0) + 1;
+    dailyCounts[dKey] = (dailyCounts[dKey] || 0) + 1;
+  });
+
+  const totalReels = count1 + count2;
+  const p1Pct = totalReels > 0 ? Math.round((count1 / totalReels) * 100) : 0;
+  const p2Pct = totalReels > 0 ? 100 - p1Pct : 0;
+  const leader = count1 >= count2 ? p1 : p2;
+
+  // 2. Reel ping-pong streak:
+  // Longest run of reels sent back-and-forth alternately (Aru -> Avu -> Aru -> Avu...)
+  // with no reel from the same person twice in a row breaking the streak.
+  let maxStreak = 0;
+  let maxStartDate = null;
+  let maxEndDate = null;
+
+  if (reelMessages.length === 1) {
+    maxStreak = 1;
+    maxStartDate = getMsgDate(reelMessages[0]);
+    maxEndDate = getMsgDate(reelMessages[0]);
+  } else if (reelMessages.length > 1) {
+    let currentStreak = 1;
+    let currentStart = reelMessages[0];
+    maxStreak = 1;
+    maxStartDate = getMsgDate(reelMessages[0]);
+    maxEndDate = getMsgDate(reelMessages[0]);
+
+    for (let i = 1; i < reelMessages.length; i++) {
+      const prevMsg = reelMessages[i - 1];
+      const currMsg = reelMessages[i];
+
+      if (currMsg.sender !== prevMsg.sender) {
+        currentStreak++;
+        if (currentStreak > maxStreak) {
+          maxStreak = currentStreak;
+          maxStartDate = getMsgDate(currentStart);
+          maxEndDate = getMsgDate(currMsg);
+        }
+      } else {
+        currentStreak = 1;
+        currentStart = currMsg;
+      }
+    }
+  }
+
+  // 3. Most active reel period
+  const busiestMonthEntry = Object.entries(monthlyCounts).sort((a, b) => b[1] - a[1])[0];
+  const busiestDayEntry = Object.entries(dailyCounts).sort((a, b) => b[1] - a[1])[0];
+
+  const busiestMonth = busiestMonthEntry
+    ? (() => {
+        const [year, month] = busiestMonthEntry[0].split('-').map(Number);
+        return {
+          label: `${MONTH_NAMES[month - 1]} ${year}`,
+          count: busiestMonthEntry[1],
+        };
+      })()
+    : null;
+
+  const busiestDay = busiestDayEntry
+    ? {
+        label: new Date(busiestDayEntry[0]).toLocaleDateString('en-US', {
+          day: 'numeric',
+          month: 'long',
+          year: 'numeric',
+        }),
+        count: busiestDayEntry[1],
+      }
+    : null;
+
+  const monthlyTrend = Object.entries(monthlyCounts)
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, count]) => {
+      const [year, month] = key.split('-');
+      const date = new Date(parseInt(year, 10), parseInt(month, 10) - 1, 1);
+      return {
+        key,
+        label: date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+        count,
+      };
+    });
+
+  return {
+    senders: [p1, p2],
+    totalReels,
+    p1: { name: p1, count: count1, pct: p1Pct },
+    p2: { name: p2, count: count2, pct: p2Pct },
+    leader,
+    streak: {
+      length: maxStreak,
+      startDate: maxStartDate,
+      endDate: maxEndDate,
+      formattedStartDate: maxStartDate
+        ? maxStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : null,
+      formattedEndDate: maxEndDate
+        ? maxEndDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+        : null,
+    },
+    busiestMonth,
+    busiestDay,
+    monthlyTrend,
+  };
+}
+
+/**
+ * Calculates Instagram Media Breakdown:
+ * Categories:
+ * - 'photo': individual photos (counts batch items, skips broken references)
+ * - 'video': individual videos (counts batch items, skips broken references)
+ * - 'reel_share': reel shares
+ * - 'story_reply': story replies (tracked separately; EXCLUDED from totalMediaShared)
+ *
+ * Decision: Story replies are reactions to external content, not media exchanged directly.
+ * Therefore totalMediaShared = photos + videos + reel_share.
+ *
+ * @param {ChatMessage[]} messages
+ * @param {string[]} senders
+ */
+export function getMediaBreakdownStats(messages, senders) {
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
+  const validMessages = getNonSystemMessages(messages);
+
+  const initPerson = (name) => ({
+    name,
+    photos: 0,
+    videos: 0,
+    reels: 0,
+    storyReplies: 0,
+    totalMediaShared: 0,
+  });
+
+  const bySender = {
+    [p1]: initPerson(p1),
+    [p2]: initPerson(p2),
+  };
+
+  for (const m of validMessages) {
+    const s = bySender[m.sender];
+    if (!s) continue;
+
+    if (m.type === 'reel_share') {
+      s.reels++;
+      s.totalMediaShared++;
+    } else if (m.type === 'photo') {
+      // Count individual photos in batch, skipping missing/broken URIs
+      const count = Array.isArray(m.meta?.photos)
+        ? m.meta.photos.filter((p) => p && typeof p.uri === 'string' && p.uri.trim() !== '').length || 1
+        : 1;
+      s.photos += count;
+      s.totalMediaShared += count;
+    } else if (m.type === 'video') {
+      // Count individual videos in batch, skipping missing/broken URIs
+      const count = Array.isArray(m.meta?.videos)
+        ? m.meta.videos.filter((v) => v && typeof v.uri === 'string' && v.uri.trim() !== '').length || 1
+        : 1;
+      s.videos += count;
+      s.totalMediaShared += count;
+    } else if (m.type === 'story_reply') {
+      // Explicitly tracked separately, NOT added to totalMediaShared
+      s.storyReplies++;
+    }
+  }
+
+  const totals = {
+    photos: bySender[p1].photos + bySender[p2].photos,
+    videos: bySender[p1].videos + bySender[p2].videos,
+    reels: bySender[p1].reels + bySender[p2].reels,
+    storyReplies: bySender[p1].storyReplies + bySender[p2].storyReplies,
+    totalMediaShared: bySender[p1].totalMediaShared + bySender[p2].totalMediaShared,
+  };
+
+  const leader = bySender[p1].totalMediaShared >= bySender[p2].totalMediaShared ? p1 : p2;
+
+  return {
+    senders: [p1, p2],
+    [p1]: bySender[p1],
+    [p2]: bySender[p2],
+    totals,
+    leader,
+  };
+}
+
+/**
+ * Calculates Instagram Reaction statistics:
+ * 1. Total reactions sent per person
+ * 2. Most-used reaction emoji per person (sent to the other person) + comparison rows
+ * 3. Reaction rate: percentage of person X's messages that received a reaction from person Y
+ *    (Formula: (messages sent by X receiving >= 1 reaction from Y) / (total messages sent by X))
+ *    Strictly excludes self-reactions and deduplicates multiple reactions on the same message per actor.
+ * 4. Fastest reaction time (conditional):
+ *    If reaction timestamps are present in export, compute fastest and average reaction latency.
+ *    If absent, set hasReactionTimestamps: false and note that Instagram exports omit reaction timestamps.
+ *
+ * @param {ChatMessage[]} messages
+ * @param {string[]} senders
+ */
+export function getReactionStats(messages, senders) {
+  const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
+  const validMessages = getNonSystemMessages(messages);
+
+  let reactionsSent1 = 0;
+  let reactionsSent2 = 0;
+
+  // Track emoji frequencies when reacting to the OTHER person
+  // bySenderToOther[p1][emoji] = count of times p1 reacted with emoji to p2's messages
+  const bySenderToOther = { [p1]: {}, [p2]: {} };
+  const totalByEmoji = {};
+
+  // For reaction rate:
+  // totalSent[person] = total messages sent by that person
+  // receivedReactionFromOther[person] = count of messages sent by that person that received >= 1 reaction from the other
+  let totalSent1 = 0;
+  let totalSent2 = 0;
+  let reactedSent1 = 0;
+  let reactedSent2 = 0;
+
+  // For reaction latency (conditional):
+  let latencyCount1 = 0;
+  let latencySumMs1 = 0;
+  let fastestMs1 = Infinity;
+
+  let latencyCount2 = 0;
+  let latencySumMs2 = 0;
+  let fastestMs2 = Infinity;
+
+  let anyReactionHasTimestamp = false;
+
+  for (const m of validMessages) {
+    if (m.sender === p1) totalSent1++;
+    else if (m.sender === p2) totalSent2++;
+
+    const rawReactions = m.reactions || m.meta?.reactions || [];
+    if (!rawReactions || rawReactions.length === 0) continue;
+
+    // Deduplicate reactions per actor on this message (keep latest one per person per message)
+    const latestByActor = new Map();
+    for (const r of rawReactions) {
+      const actor = r.actor || r.sender;
+      if (!actor) continue;
+      latestByActor.set(actor, r);
+    }
+
+    const dedupedReactions = Array.from(latestByActor.values());
+
+    let p1ReactedToThisMsg = false;
+    let p2ReactedToThisMsg = false;
+
+    for (const r of dedupedReactions) {
+      const actor = r.actor || r.sender;
+      const emoji = r.emoji || r.reaction;
+      if (!emoji) continue;
+
+      if (actor === p1) reactionsSent1++;
+      else if (actor === p2) reactionsSent2++;
+
+      // When actor reacts to the OTHER person's message:
+      if (m.sender !== actor) {
+        if (actor === p1 && m.sender === p2) {
+          bySenderToOther[p1][emoji] = (bySenderToOther[p1][emoji] || 0) + 1;
+          totalByEmoji[emoji] = (totalByEmoji[emoji] || 0) + 1;
+          p1ReactedToThisMsg = true;
+
+          // Latency check
+          if (r.timestamp instanceof Date && m.timestamp instanceof Date) {
+            anyReactionHasTimestamp = true;
+            const diffMs = r.timestamp.getTime() - m.timestamp.getTime();
+            if (diffMs >= 0 && diffMs < 14 * 24 * 60 * 60 * 1000) {
+              latencySumMs1 += diffMs;
+              latencyCount1++;
+              if (diffMs < fastestMs1) fastestMs1 = diffMs;
+            }
+          }
+        } else if (actor === p2 && m.sender === p1) {
+          bySenderToOther[p2][emoji] = (bySenderToOther[p2][emoji] || 0) + 1;
+          totalByEmoji[emoji] = (totalByEmoji[emoji] || 0) + 1;
+          p2ReactedToThisMsg = true;
+
+          // Latency check
+          if (r.timestamp instanceof Date && m.timestamp instanceof Date) {
+            anyReactionHasTimestamp = true;
+            const diffMs = r.timestamp.getTime() - m.timestamp.getTime();
+            if (diffMs >= 0 && diffMs < 14 * 24 * 60 * 60 * 1000) {
+              latencySumMs2 += diffMs;
+              latencyCount2++;
+              if (diffMs < fastestMs2) fastestMs2 = diffMs;
+            }
+          }
+        }
+      }
+    }
+
+    // Reaction rate engagement tracking (strictly excluding self-reactions):
+    if (m.sender === p1 && p2ReactedToThisMsg) {
+      reactedSent1++;
+    }
+    if (m.sender === p2 && p1ReactedToThisMsg) {
+      reactedSent2++;
+    }
+  }
+
+  const totalReactionsSent = reactionsSent1 + reactionsSent2;
+  const p1SentPct = totalReactionsSent > 0 ? Math.round((reactionsSent1 / totalReactionsSent) * 100) : 0;
+  const p2SentPct = totalReactionsSent > 0 ? 100 - p1SentPct : 0;
+  const reactionsSentLeader = reactionsSent1 >= reactionsSent2 ? p1 : p2;
+
+  // Reaction rates:
+  const p1ReactionRate = totalSent1 > 0 ? +((reactedSent1 / totalSent1) * 100).toFixed(1) : 0;
+  const p2ReactionRate = totalSent2 > 0 ? +((reactedSent2 / totalSent2) * 100).toFixed(1) : 0;
+  const reactionRateLeader = p1ReactionRate >= p2ReactionRate ? p1 : p2;
+
+  // Most used reaction emoji per person
+  const sortedP1Emojis = Object.entries(bySenderToOther[p1]).sort((a, b) => b[1] - a[1]);
+  const sortedP2Emojis = Object.entries(bySenderToOther[p2]).sort((a, b) => b[1] - a[1]);
+
+  const p1TopEmoji = sortedP1Emojis[0] ? { emoji: sortedP1Emojis[0][0], count: sortedP1Emojis[0][1] } : null;
+  const p2TopEmoji = sortedP2Emojis[0] ? { emoji: sortedP2Emojis[0][0], count: sortedP2Emojis[0][1] } : null;
+
+  // Emoji comparison rows for visualization matching EmojiStats.jsx
+  const topReactionEmojis = Object.entries(totalByEmoji)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([e]) => e);
+
+  const comparisonRows = topReactionEmojis.map((e) => ({
+    emoji: e,
+    left: bySenderToOther[p1]?.[e] || 0,
+    right: bySenderToOther[p2]?.[e] || 0,
+  }));
+
+  const maxVal = Math.max(...comparisonRows.map((r) => Math.max(r.left, r.right)), 1);
+
+  // Reaction times (conditional)
+  const p1AvgLatency = latencyCount1 > 0 ? Math.round(latencySumMs1 / latencyCount1) : null;
+  const p2AvgLatency = latencyCount2 > 0 ? Math.round(latencySumMs2 / latencyCount2) : null;
+  const p1Fastest = fastestMs1 !== Infinity ? fastestMs1 : null;
+  const p2Fastest = fastestMs2 !== Infinity ? fastestMs2 : null;
+
+  return {
+    senders: [p1, p2],
+    totalReactionsSent,
+    reactionsSent: {
+      [p1]: { count: reactionsSent1, pct: p1SentPct },
+      [p2]: { count: reactionsSent2, pct: p2SentPct },
+      leader: reactionsSentLeader,
+    },
+    reactionRates: {
+      [p1]: {
+        rate: p1ReactionRate,
+        messagesReacted: reactedSent1,
+        totalMessages: totalSent1,
+      },
+      [p2]: {
+        rate: p2ReactionRate,
+        messagesReacted: reactedSent2,
+        totalMessages: totalSent2,
+      },
+      leader: reactionRateLeader,
+    },
+    topEmoji: {
+      [p1]: p1TopEmoji,
+      [p2]: p2TopEmoji,
+    },
+    comparison: {
+      order: [p1, p2],
+      rows: comparisonRows,
+      maxVal,
+    },
+    timing: {
+      hasReactionTimestamps: anyReactionHasTimestamp,
+      [p1]: {
+        avgMs: p1AvgLatency,
+        formattedAvg: p1AvgLatency != null ? formatResponseTime(p1AvgLatency) : null,
+        fastestMs: p1Fastest,
+        formattedFastest: p1Fastest != null ? formatResponseTime(p1Fastest) : null,
+      },
+      [p2]: {
+        avgMs: p2AvgLatency,
+        formattedAvg: p2AvgLatency != null ? formatResponseTime(p2AvgLatency) : null,
+        fastestMs: p2Fastest,
+        formattedFastest: p2Fastest != null ? formatResponseTime(p2Fastest) : null,
+      },
+    },
+  };
+}
+
+/**
+ * Cross-Platform Unification Statistics (Phase 4)
+ * Combines messages from multiple platforms (WhatsApp, Telegram, Instagram)
+ * into a single unified relationship view.
+ *
+ * @param {ChatMessage[]} messages - Unified chronological message array
+ * @param {Record<string, { platform: string, messages: ChatMessage[], rawSenders?: string[] }>} [loadedPlatforms]
+ * @returns {Object}
+ */
+export function getCrossPlatformStats(messages, loadedPlatforms = {}) {
+  const validMessages = getNonSystemMessages(messages);
+
+  const platformCounts = {
+    whatsapp: 0,
+    telegram: 0,
+    instagram: 0,
+  };
+
+  const platformDates = {
+    whatsapp: { first: null, last: null },
+    telegram: { first: null, last: null },
+    instagram: { first: null, last: null },
+  };
+
+  for (const m of validMessages) {
+    const p = m.platform || 'whatsapp';
+    if (platformCounts[p] == null) {
+      platformCounts[p] = 0;
+      platformDates[p] = { first: null, last: null };
+    }
+    platformCounts[p]++;
+
+    const d = getMsgDate(m);
+    if (!platformDates[p].first || d < platformDates[p].first) {
+      platformDates[p].first = d;
+    }
+    if (!platformDates[p].last || d > platformDates[p].last) {
+      platformDates[p].last = d;
+    }
+  }
+
+  if (loadedPlatforms && typeof loadedPlatforms === 'object') {
+    for (const key of Object.keys(loadedPlatforms)) {
+      if (platformCounts[key] == null) {
+        platformCounts[key] = 0;
+        platformDates[key] = { first: null, last: null };
+      }
+    }
+  }
+
+  const activePlatforms = Object.keys(platformCounts).filter((p) => platformCounts[p] > 0);
+  const isMultiPlatform = activePlatforms.length > 1;
+  const totalMessages = validMessages.length;
+
+  const platformBreakdown = activePlatforms
+    .map((p) => {
+      const count = platformCounts[p];
+      const pct = totalMessages > 0 ? Math.round((count / totalMessages) * 1000) / 10 : 0;
+      const dates = platformDates[p] || {};
+      return {
+        platform: p,
+        name: p === 'whatsapp' ? 'WhatsApp' : p === 'telegram' ? 'Telegram' : p === 'instagram' ? 'Instagram' : p,
+        count,
+        pct,
+        firstDate: dates.first,
+        lastDate: dates.last,
+        color: p === 'whatsapp' ? '#25D366' : p === 'telegram' ? '#2AABEE' : '#8A2BE2',
+      };
+    })
+    .sort((a, b) => b.count - a.count);
+
+  // 1. Absolute first message ever across all loaded platforms
+  let earliestMsg = null;
+  let earliestTime = Infinity;
+
+  for (const m of validMessages) {
+    const t = getMsgDate(m).getTime();
+    if (t < earliestTime) {
+      earliestTime = t;
+      earliestMsg = m;
+    }
+  }
+
+  let firstMessage = null;
+  if (earliestMsg) {
+    const d = getMsgDate(earliestMsg);
+    firstMessage = {
+      id: earliestMsg.id,
+      sender: earliestMsg.sender,
+      platform: earliestMsg.platform || 'whatsapp',
+      platformName:
+        earliestMsg.platform === 'instagram'
+          ? 'Instagram'
+          : earliestMsg.platform === 'telegram'
+          ? 'Telegram'
+          : 'WhatsApp',
+      text: earliestMsg.text || '',
+      timestamp: d,
+      formattedDate: d.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      formattedTime: d.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      }),
+    };
+  }
+
+  // 2. Busiest single day combined across all platforms
+  const dayMap = {};
+  for (const m of validMessages) {
+    const d = getMsgDate(m);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    if (!dayMap[key]) {
+      dayMap[key] = {
+        dateKey: key,
+        date: d,
+        total: 0,
+        whatsapp: 0,
+        telegram: 0,
+        instagram: 0,
+      };
+    }
+    const p = m.platform || 'whatsapp';
+    dayMap[key].total++;
+    if (dayMap[key][p] != null) {
+      dayMap[key][p]++;
+    } else {
+      dayMap[key][p] = 1;
+    }
+  }
+
+  let maxDayTotal = 0;
+  let busiestDayObj = null;
+  for (const key of Object.keys(dayMap)) {
+    if (dayMap[key].total > maxDayTotal) {
+      maxDayTotal = dayMap[key].total;
+      busiestDayObj = dayMap[key];
+    }
+  }
+
+  let busiestDay = null;
+  if (busiestDayObj) {
+    const bTotal = busiestDayObj.total;
+    busiestDay = {
+      dateKey: busiestDayObj.dateKey,
+      total: bTotal,
+      formattedDate: busiestDayObj.date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      weekday: busiestDayObj.date.toLocaleDateString('en-US', { weekday: 'long' }),
+      breakdown: {
+        whatsapp: busiestDayObj.whatsapp || 0,
+        telegram: busiestDayObj.telegram || 0,
+        instagram: busiestDayObj.instagram || 0,
+      },
+      shares: {
+        whatsapp: bTotal > 0 ? Math.round(((busiestDayObj.whatsapp || 0) / bTotal) * 100) : 0,
+        telegram: bTotal > 0 ? Math.round(((busiestDayObj.telegram || 0) / bTotal) * 100) : 0,
+        instagram: bTotal > 0 ? Math.round(((busiestDayObj.instagram || 0) / bTotal) * 100) : 0,
+      },
+    };
+  }
+
+  // 3. Platform migration chart (monthly bins)
+  const monthMap = {};
+  for (const m of validMessages) {
+    const d = getMsgDate(m);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    if (!monthMap[key]) {
+      monthMap[key] = {
+        monthKey: key,
+        date: new Date(d.getFullYear(), d.getMonth(), 1),
+        total: 0,
+        whatsapp: 0,
+        telegram: 0,
+        instagram: 0,
+      };
+    }
+    const p = m.platform || 'whatsapp';
+    monthMap[key].total++;
+    if (monthMap[key][p] != null) {
+      monthMap[key][p]++;
+    } else {
+      monthMap[key][p] = 1;
+    }
+  }
+
+  const sortedMonthKeys = Object.keys(monthMap).sort();
+  const migrationTimeline = sortedMonthKeys.map((key) => {
+    const item = monthMap[key];
+    const total = item.total;
+    return {
+      monthKey: key,
+      label: item.date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
+      fullLabel: item.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+      total,
+      whatsapp: item.whatsapp || 0,
+      telegram: item.telegram || 0,
+      instagram: item.instagram || 0,
+      shares: {
+        whatsapp: total > 0 ? Math.round(((item.whatsapp || 0) / total) * 100) : 0,
+        telegram: total > 0 ? Math.round(((item.telegram || 0) / total) * 100) : 0,
+        instagram: total > 0 ? Math.round(((item.instagram || 0) / total) * 100) : 0,
+      },
+      dominantPlatform:
+        (item.whatsapp || 0) >= (item.telegram || 0) && (item.whatsapp || 0) >= (item.instagram || 0)
+          ? 'whatsapp'
+          : (item.telegram || 0) >= (item.instagram || 0)
+          ? 'telegram'
+          : 'instagram',
+    };
+  });
+
+  const maxMonthTotal = Math.max(...migrationTimeline.map((m) => m.total), 1);
+
+  let migrationNarrative = '';
+  if (migrationTimeline.length > 0) {
+    if (!isMultiPlatform) {
+      const p = activePlatforms[0] || 'whatsapp';
+      const name = p === 'whatsapp' ? 'WhatsApp' : p === 'telegram' ? 'Telegram' : 'Instagram';
+      migrationNarrative = `Currently showing your entire conversation history on ${name}.`;
+    } else {
+      const firstMonth = migrationTimeline[0];
+      const lastMonth = migrationTimeline[migrationTimeline.length - 1];
+      const pName = (p) => (p === 'whatsapp' ? 'WhatsApp' : p === 'telegram' ? 'Telegram' : 'Instagram');
+      if (firstMonth.dominantPlatform === lastMonth.dominantPlatform) {
+        migrationNarrative = `Your primary home has been ${pName(firstMonth.dominantPlatform)}, with rich conversations spanning across platforms.`;
+      } else {
+        migrationNarrative = `Your conversation journey started on ${pName(firstMonth.dominantPlatform)} in ${firstMonth.label}, and steadily expanded onto ${pName(lastMonth.dominantPlatform)}.`;
+      }
+    }
+  }
+
+  return {
+    isMultiPlatform,
+    activePlatforms,
+    totalMessages,
+    platformBreakdown,
+    firstMessage,
+    busiestDay,
+    migrationTimeline,
+    maxMonthTotal,
+    migrationNarrative,
   };
 }

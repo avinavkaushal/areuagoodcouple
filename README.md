@@ -1,10 +1,12 @@
 # areuagoodcouple ✨
 
-> **Turn your WhatsApp & Telegram chats into a private, cinematic visual story.**
+> **Turn your WhatsApp, Telegram & Instagram chats into a private, cinematic visual story.**
 
 [![Live Demo](https://img.shields.io/badge/Live%20Demo-areuagoodcouple.vercel.app-ff85bb?style=for-the-badge&logo=vercel&logoColor=white)](https://areuagoodcouple.vercel.app)
 
-**areuagoodcouple** is a privacy-first chat analyzer and interactive visual story built for couples and close friends. Supporting both **WhatsApp** (`.txt`) and **Telegram** (`result.json`) exports, simply drop your chat export file, map participant names to **Her & Him**, and the app instantly transforms months or years of messages into a fluid, animated experience filled with milestones, heatmaps, response patterns, and cherished memories.
+**areuagoodcouple** is a privacy-first chat analyzer and interactive visual story built for couples and close friends. Supporting **WhatsApp** (`.txt`), **Telegram** (`result.json`), and **Instagram DM** (`message_*.json`) exports, simply drop your chat export files, map participant handles to **Her & Him**, and the app instantly transforms months or years of messages into a fluid, animated experience filled with milestones, heatmaps, response patterns, and cherished memories.
+
+You can even upload multiple platforms together or link platforms seamlessly into a **Cross-Platform Unified Story**!
 
 ---
 
@@ -19,18 +21,22 @@ Experience the app live in your browser:
 
 Your messages never leave your device.
 - **Zero Server Uploads**: No database, no backend server, and no cloud storage.
-- **Client-Side Parsing**: All file parsing, regex tokenization, JSON parsing, and analytics occur purely inside your browser.
+- **Client-Side Parsing**: All file parsing, UTF-8 mojibake repair, regex tokenization, JSON parsing, and analytics occur purely inside your browser.
 - **Web Worker Acceleration**: Searching and heavy computations run in background threads to keep the UI silky smooth at 60 FPS.
 
 ---
 
 ## ✨ Features & Highlights
 
-- **💬 Dual-Platform Support**: Auto-detects and seamlessly parses both **WhatsApp** (`.txt`) and **Telegram Desktop** (`result.json`) exports, handling message replies, forwarded messages, stickers, media, and reaction emojis.
-- **🏷️ Interactive Name Mapping**: Easily map chat handles to **Her & Him** on upload or anytime via the floating Settings modal.
+- **💬 Triple-Platform Support**: Auto-detects and seamlessly parses **WhatsApp** (`.txt`), **Telegram Desktop** (`result.json`), and **Instagram DM** (`message_*.json`) exports.
+- **🌐 Cross-Platform Unification**: Combine WhatsApp, Telegram, and Instagram conversations into one cohesive relationship history. Features platform presence distributions, platform migration timelines, and liquid glass switchers.
+- **🎞️ Instagram Reels Exchange**: Track reel volume, identify who sends the most reels, calculate reel ping-pong alternation streaks, and discover your peak reel-sharing months.
+- **📸 Rich Media Breakdown**: Granular visual breakdown of photos, videos, reel shares, and story replies sent by each person.
+- **❤️ Reaction Analytics**: Count total reactions sent, measure message reaction rates (how often your messages get reacted to), uncover top reaction emojis, and analyze reaction response speed.
+- **🏷️ Interactive Name Mapping**: Easily map chat handles to **Her & Him** per platform on upload or anytime via the floating Settings modal.
 - **🎬 Cinematic Dark Atmosphere**: Ambient looping glow background video, frosted glass cards, and fluid GSAP scroll-triggered animations.
 - **📈 Milestones & Big Numbers**: Total messages exchanged, words typed, average daily pace, longest consecutive days talking, and your single busiest chat day.
-- **📅 Calendar Heatmap**: GitHub-style year-long contribution grid mapping out text intensity for every single day.
+- **📅 Liquid Glass Calendar Heatmap**: GitHub-style year-long contribution grid with active liquid glass platform filtering (All, WhatsApp, Instagram, Telegram).
 - **⚡ The Waiting Game**: Calculates average reply latency for both participants and surfaces the longest recorded wait before replying.
 - **🌅 Morning & Night Streaks**: Discovers who says "Good morning" and "Good night" first and tracks consecutive streak records.
 - **💖 Terms of Endearment**: An affectionate leaderboard tracking pet names, sweet words, and love terms over time.
@@ -40,7 +46,7 @@ Your messages never leave your device.
 - **☁️ Word Cloud**: Visual cloud of your most frequently typed words.
 - **🎲 Random Memory Bookmark**: Click to roll the dice and freeze frame into an authentic historical chat exchange.
 - **📜 Longest Monologue**: Pinpoints the longest single message typed in one breath.
-- **🧭 Dynamic Navigation Bar**: Smooth floating quick-jump bar with scroll-spy tracking.
+- **🧭 Dynamic Navigation Bar**: Floating quick-jump bar with scroll-spy tracking that automatically adapts to the active platforms and available data.
 
 ---
 
@@ -51,16 +57,29 @@ Your messages never leave your device.
 2. Open the 1-on-1 chat you want to analyze.
 3. Tap **More (⋮)** (or the contact's name at the top on iOS).
 4. Tap **Export Chat**.
-5. Select **Without Media** *(important — this creates a lightweight `.txt` export)*.
-6. Open **[areuagoodcouple.vercel.app](https://areuagoodcouple.vercel.app)** and drop the `.txt` file onto the upload zone!
+5. Select **Without Media** *(creates a lightweight `.txt` export)*.
+6. Drop the `.txt` file onto **[areuagoodcouple.vercel.app](https://areuagoodcouple.vercel.app)**!
 
 ### Telegram (.json)
 1. Open Telegram Desktop on your computer.
 2. Open the 1-on-1 chat you want to analyze.
-3. Click the top-right menu **(⋮)** &rarr; **Export chat history**.
+3. Click the top-right menu **(⋮)** → **Export chat history**.
 4. Set the format to **Machine-readable JSON** (uncheck media for a fast export).
 5. Export and drop the resulting `result.json` onto the upload zone!
-6. Confirm the detected platform and map participant names to Her & Him.
+
+### Instagram (.json)
+1. Go to **Instagram Settings** (on mobile or web) → **Accounts Center**.
+2. Select **Your information and permissions** → **Download your information**.
+3. Choose **Download or transfer information** → **Some of your information**.
+4. Scroll down and select **Messages**.
+5. Select **Download to device**:
+   - **Format**: **JSON** *(required)*
+   - **Media quality**: Low (or omit media for fastest export)
+   - **Date range**: All time (or your desired range)
+6. Once ready, download and unzip the archive.
+7. Navigate to `your_instagram_activity/messages/inbox/<partner_name>/`.
+8. Drop `message_1.json` (or select all `message_*.json` files together if paginated) onto the upload zone!
+   - *Tip: You can also drop your WhatsApp `.txt` and Instagram `message_*.json` files together to analyze both platforms at once.*
 
 ---
 
@@ -81,7 +100,7 @@ Clone the repository and install dependencies:
 
 ```bash
 git clone https://github.com/avinavkaushal/areuagoodcouple.git
-cd aruavu
+cd areuagoodcouple
 npm install
 ```
 
@@ -91,16 +110,22 @@ Start the Vite development server:
 npm run dev
 ```
 
-Build for production:
+Run unit tests:
 
 ```bash
-npm run build
+npm test
 ```
 
 Run linter:
 
 ```bash
 npm run lint
+```
+
+Build for production:
+
+```bash
+npm run build
 ```
 
 ---

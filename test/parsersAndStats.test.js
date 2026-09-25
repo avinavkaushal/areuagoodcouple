@@ -1,12 +1,16 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { Buffer } from 'node:buffer';
 import {
   parseTelegramJson,
   parseWhatsApp,
+  parseInstagramJson,
   parseChatFile,
+  parseChatFiles,
   applyNicknameMapping,
   detectPlatform,
   flattenTelegramText,
+  fixMojibake,
 } from '../src/lib/parseChat.js';
 import { resolveSenderMapping } from '../src/lib/nicknameConfig.js';
 import {
@@ -28,6 +32,10 @@ import {
   getLoveWordStats,
   getRandomMemory,
   getCalloutStats,
+  getReelStats,
+  getMediaBreakdownStats,
+  getReactionStats,
+  getCrossPlatformStats,
 } from '../src/lib/stats.js';
 
 describe('Telegram JSON Parsing', () => {
@@ -272,7 +280,8 @@ describe('Platform Detection and parseChatFile abstraction', () => {
         await parseChatFile(file);
       },
       {
-        message: 'Unrecognized format. Please provide a valid WhatsApp .txt export or Telegram .json export.',
+        message:
+          'Unrecognized format. Please provide a valid WhatsApp .txt export, Telegram .json export, or Instagram .json export.',
       }
     );
   });
@@ -451,3 +460,713 @@ describe('Downstream Feature Stats with Normalized ChatMessage', () => {
     assert.equal(callouts.night.counts.Him, 1);
   });
 });
+
+describe('Instagram UTF-8 Mojibake Fix', () => {
+  test('decodes mojibake emoji correctly', () => {
+    // 😂 is UTF-8 [0xF0, 0x9F, 0x98, 0x82]
+    const mojibake = '\u00f0\u009f\u0098\u0082';
+    assert.equal(fixMojibake(mojibake), '😂');
+  });
+
+  test('decodes Hinglish text with mojibake emoji and Hindi Devanagari script', () => {
+    // नमस्ते -> UTF-8 bytes decoded as Latin-1
+    const hindiBytes = Buffer.from('नमस्ते', 'utf-8');
+    const mojibakeHindi = String.fromCharCode(...hindiBytes);
+    assert.equal(fixMojibake(mojibakeHindi), 'नमस्ते');
+
+    // Hinglish sentence
+    const heartMojibake = '\u00e2\u009d\u00a4\u00ef\u00b8\u008f';
+    const hinglish = `kya haal hai baby ${heartMojibake}`;
+    assert.equal(fixMojibake(hinglish), 'kya haal hai baby ❤️');
+  });
+
+  test('safely leaves already-decoded Unicode and pure ASCII unchanged', () => {
+    assert.equal(fixMojibake('Already decoded 😂 and नमस्ते'), 'Already decoded 😂 and नमस्ते');
+    assert.equal(fixMojibake('Simple English sentence 123!'), 'Simple English sentence 123!');
+    assert.equal(fixMojibake(''), '');
+    assert.equal(fixMojibake(null), null);
+  });
+});
+
+describe('Instagram JSON Parsing and Schema Normalization', () => {
+  const sampleIgJsonBatch1 = {
+    participants: [{ name: '\u0041\u0072\u0075' }, { name: '\u0041\u0076\u0075' }],
+    messages: [
+      {
+        sender_name: 'Aru',
+        timestamp_ms: 1729500000000, // Newer message
+        content: 'check this reel!',
+        share: { link: 'https://www.instagram.com/reel/DBa123xyz/' },
+        reactions: [{ reaction: '\u00e2\u009d\u00a4\u00ef\u00b8\u008f', actor: 'Avu' }],
+      },
+      {
+        sender_name: 'Avu',
+        timestamp_ms: 1729490000000,
+        content: 'Replied to their story: cute outfit!',
+        share: { link: 'https://www.instagram.com/stories/aru/12345/' },
+      },
+      {
+        sender_name: 'Aru',
+        timestamp_ms: 1729480000000,
+        content: 'look at our trip',
+        photos: [
+          { uri: 'photos/trip1.jpg', creation_timestamp: 1729480000 },
+          { uri: 'photos/trip2.jpg', creation_timestamp: 1729480000 },
+          { uri: '', creation_timestamp: 0 }, // broken URI to be ignored
+        ],
+      },
+      {
+        sender_name: 'Avu',
+        timestamp_ms: 1729470000000,
+        content: 'concert clip',
+        videos: [{ uri: 'videos/clip.mp4' }],
+      },
+      {
+        sender_name: 'Aru',
+        timestamp_ms: 1729465000000,
+        content: 'You unsent a message', // Deleted/unsent placeholder
+      },
+      {
+        sender_name: 'Avu',
+        timestamp_ms: 1729460000000,
+        is_unsent: true, // Marked unsent flag
+        content: '',
+      },
+      {
+        sender_name: 'Avu',
+        timestamp_ms: 1729450000000, // Oldest in batch 1
+        content: 'Good morning \u00f0\u009f\u0098\u008a', // mojibake 😊
+      },
+    ],
+  };
+
+  const sampleIgJsonBatch2 = {
+    participants: [{ name: 'Aru' }, { name: 'Avu' }],
+    messages: [
+      {
+        sender_name: 'Aru',
+        timestamp_ms: 1729440000000, // Older than batch 1
+        content: 'another reel back to you',
+        share: { link: 'https://instagram.com/reels/Cxyz890/' },
+      },
+      {
+        // Duplicate of message in batch 1 to test deduplication across file boundaries
+        sender_name: 'Avu',
+        timestamp_ms: 1729450000000,
+        content: 'Good morning \u00f0\u009f\u0098\u008a',
+      },
+    ],
+  };
+
+  test('parses single Instagram JSON export with mojibake fix and filters unsent', () => {
+    const nicknameMap = { Aru: 'Her', Avu: 'Him' };
+    const res = parseInstagramJson(sampleIgJsonBatch1, nicknameMap);
+
+    assert.equal(res.platform, 'instagram');
+    assert.deepEqual(res.rawSenders.sort(), ['Aru', 'Avu'].sort());
+    assert.deepEqual(res.senders.sort(), ['Her', 'Him'].sort());
+
+    // 7 raw messages - 2 unsent = 5 valid messages
+    assert.equal(res.messages.length, 5);
+
+    // Messages must be sorted chronologically ascending
+    for (let i = 1; i < res.messages.length; i++) {
+      assert.ok(res.messages[i].timestamp.getTime() >= res.messages[i - 1].timestamp.getTime());
+    }
+
+    // Message 1 (oldest): Good morning 😊
+    const msg1 = res.messages[0];
+    assert.equal(msg1.sender, 'Him');
+    assert.equal(msg1.type, 'text');
+    assert.equal(msg1.text, 'Good morning 😊');
+    assert.equal(msg1.content, 'Good morning 😊');
+
+    // Message 2: Video
+    const msg2 = res.messages[1];
+    assert.equal(msg2.sender, 'Him');
+    assert.equal(msg2.type, 'video');
+
+    // Message 3: Photos (valid photos filtered)
+    const msg3 = res.messages[2];
+    assert.equal(msg3.sender, 'Her');
+    assert.equal(msg3.type, 'photo');
+    assert.equal(msg3.meta.photos.length, 2); // 3 raw photos - 1 broken = 2
+
+    // Message 4: Story reply
+    const msg4 = res.messages[3];
+    assert.equal(msg4.sender, 'Him');
+    assert.equal(msg4.type, 'story_reply');
+
+    // Message 5: Reel share with reaction
+    const msg5 = res.messages[4];
+    assert.equal(msg5.sender, 'Her');
+    assert.equal(msg5.meta.reactions[0].emoji, '❤️');
+    assert.equal(msg5.meta.reactions[0].actor, 'Him');
+    assert.equal(msg5.meta.reactions[0].sender, 'Him');
+  });
+
+  test('merges multiple paginated files and deduplicates cross-file overlap', () => {
+    const nicknameMap = { Aru: 'Her', Avu: 'Him' };
+    const res = parseInstagramJson([sampleIgJsonBatch1, sampleIgJsonBatch2], nicknameMap);
+
+    // Batch 1 had 5 valid, Batch 2 had 1 older message + 1 duplicate of batch 1 -> total 6
+    assert.equal(res.messages.length, 6);
+
+    // First message should be from Batch 2 (timestamp 1729440000000)
+    assert.equal(res.messages[0].timestamp.getTime(), 1729440000000);
+    assert.equal(res.messages[0].type, 'reel_share');
+  });
+
+  test('detectPlatform correctly detects Instagram vs Telegram vs WhatsApp', () => {
+    const igJson = JSON.stringify({
+      participants: [{ name: 'Aru' }],
+      messages: [{ sender_name: 'Aru', timestamp_ms: 123456789, content: 'hi' }],
+    });
+    assert.equal(detectPlatform(igJson, 'message_1.json').platform, 'instagram');
+
+    const tgJson = JSON.stringify({
+      name: 'Chat',
+      type: 'personal_chat',
+      id: 999,
+      messages: [{ id: 1, from: 'Alice', date: '2024-10-01' }],
+    });
+    assert.equal(detectPlatform(tgJson, 'result.json').platform, 'telegram');
+
+    const wa = '21/10/24, 16:13 - Aru: hello';
+    assert.equal(detectPlatform(wa, '_chat.txt').platform, 'whatsapp');
+  });
+
+  test('parseChatFiles resolves multiple Instagram JSON Files', async () => {
+    const f1 = new File([JSON.stringify(sampleIgJsonBatch1)], 'message_1.json', { type: 'application/json' });
+    const f2 = new File([JSON.stringify(sampleIgJsonBatch2)], 'message_2.json', { type: 'application/json' });
+
+    const res = await parseChatFiles([f1, f2]);
+    assert.equal(res.platform, 'instagram');
+    assert.equal(res.messages.length, 6);
+  });
+});
+
+describe('Instagram Reel Statistics (Phase 1 Part B)', () => {
+  const reelMessages = [
+    // Non-reel text
+    { sender: 'Her', type: 'text', timestamp: new Date('2024-10-01T10:00:00') },
+    // Reel 1: Her -> streak 1
+    { sender: 'Her', type: 'reel_share', timestamp: new Date('2024-10-01T11:00:00') },
+    // Reel 2: Him -> streak 2
+    { sender: 'Him', type: 'reel_share', timestamp: new Date('2024-10-01T12:00:00') },
+    // Reel 3: Her -> streak 3
+    { sender: 'Her', type: 'reel_share', timestamp: new Date('2024-10-02T13:00:00') },
+    // Reel 4: Him -> streak 4
+    { sender: 'Him', type: 'reel_share', timestamp: new Date('2024-10-02T14:00:00') },
+    // Reel 5: Him sends another reel immediately! Breaks streak -> streak resets to 1 (starting at Reel 5)
+    { sender: 'Him', type: 'reel_share', timestamp: new Date('2024-10-03T15:00:00') },
+    // Reel 6: Her -> streak 2
+    { sender: 'Her', type: 'reel_share', timestamp: new Date('2024-10-03T16:00:00') },
+    // Reel 7: Him (in November) -> streak 3
+    { sender: 'Him', type: 'reel_share', timestamp: new Date('2024-11-01T10:00:00') },
+  ];
+
+  const senders = ['Her', 'Him'];
+
+  test('calculates reel count per person and identifies leader', () => {
+    const stats = getReelStats(reelMessages, senders);
+    // Her: Reel 1, 3, 6 (3 reels)
+    // Him: Reel 2, 4, 5, 7 (4 reels)
+    assert.equal(stats.totalReels, 7);
+    assert.equal(stats.p1.count, 3);
+    assert.equal(stats.p2.count, 4);
+    assert.equal(stats.leader, 'Him');
+    assert.equal(stats.p2.pct, Math.round((4 / 7) * 100));
+  });
+
+  test('calculates reel ping-pong streak and start/end dates', () => {
+    const stats = getReelStats(reelMessages, senders);
+    // Longest streak was Reel 1 to Reel 4 (Her -> Him -> Her -> Him) = 4 reels!
+    assert.equal(stats.streak.length, 4);
+    assert.equal(stats.streak.startDate.getTime(), new Date('2024-10-01T11:00:00').getTime());
+    assert.equal(stats.streak.endDate.getTime(), new Date('2024-10-02T14:00:00').getTime());
+  });
+
+  test('handles edge case of 0 and 1 reel gracefully', () => {
+    const zero = getReelStats([], senders);
+    assert.equal(zero.totalReels, 0);
+    assert.equal(zero.streak.length, 0);
+    assert.equal(zero.streak.startDate, null);
+
+    const one = getReelStats([{ sender: 'Her', type: 'reel_share', timestamp: new Date('2024-10-01') }], senders);
+    assert.equal(one.totalReels, 1);
+    assert.equal(one.streak.length, 1);
+    assert.ok(one.streak.startDate);
+  });
+
+  test('identifies busiest reel month and day', () => {
+    const stats = getReelStats(reelMessages, senders);
+    // 6 reels in October, 1 in November
+    assert.equal(stats.busiestMonth.label, 'October 2024');
+    assert.equal(stats.busiestMonth.count, 6);
+  });
+});
+
+describe('Instagram Media Breakdown Statistics (Phase 2)', () => {
+  const mediaMessages = [
+    // 1 text
+    { sender: 'Her', type: 'text', timestamp: new Date() },
+    // Her: 1 single photo
+    { sender: 'Her', type: 'photo', timestamp: new Date(), meta: { photos: [{ uri: '1.jpg' }] } },
+    // Her: batch of 3 photos in 1 message
+    {
+      sender: 'Her',
+      type: 'photo',
+      timestamp: new Date(),
+      meta: { photos: [{ uri: '2.jpg' }, { uri: '3.jpg' }, { uri: '4.jpg' }] },
+    },
+    // Him: 1 video
+    { sender: 'Him', type: 'video', timestamp: new Date(), meta: { videos: [{ uri: 'v1.mp4' }] } },
+    // Her: 2 reels
+    { sender: 'Her', type: 'reel_share', timestamp: new Date() },
+    { sender: 'Her', type: 'reel_share', timestamp: new Date() },
+    // Him: 1 reel
+    { sender: 'Him', type: 'reel_share', timestamp: new Date() },
+    // Him: 2 story replies (must be EXCLUDED from totalMediaShared!)
+    { sender: 'Him', type: 'story_reply', timestamp: new Date() },
+    { sender: 'Him', type: 'story_reply', timestamp: new Date() },
+  ];
+
+  const senders = ['Her', 'Him'];
+
+  test('counts individual media items in batches and skips broken files', () => {
+    const stats = getMediaBreakdownStats(mediaMessages, senders);
+
+    // Her photos: 1 + 3 = 4 photos
+    assert.equal(stats.Her.photos, 4);
+    // Her reels: 2
+    assert.equal(stats.Her.reels, 2);
+    // Her total direct media shared = 4 photos + 2 reels = 6
+    assert.equal(stats.Her.totalMediaShared, 6);
+
+    // Him video: 1
+    assert.equal(stats.Him.videos, 1);
+    // Him reel: 1
+    assert.equal(stats.Him.reels, 1);
+    // Him story replies: 2
+    assert.equal(stats.Him.storyReplies, 2);
+    // Him total direct media shared = 1 video + 1 reel = 2 (STORY REPLIES EXCLUDED!)
+    assert.equal(stats.Him.totalMediaShared, 2);
+
+    // Overall totals
+    assert.equal(stats.totals.photos, 4);
+    assert.equal(stats.totals.videos, 1);
+    assert.equal(stats.totals.reels, 3);
+    assert.equal(stats.totals.storyReplies, 2);
+    // Total media shared = 4 + 1 + 3 = 8
+    assert.equal(stats.totals.totalMediaShared, 8);
+    assert.equal(stats.leader, 'Her');
+  });
+
+  test('isMediaMessage recognizes new media types for overview stats', () => {
+    const overview = getOverviewStats(mediaMessages);
+    // 9 total messages - 0 system = 9
+    assert.equal(overview.totalMessages, 9);
+    // 2 photo msgs + 1 video msg + 3 reel msgs = 6 media messages (story replies excluded from media)
+    assert.equal(overview.totalMedia, 6);
+  });
+});
+
+describe('Instagram Reaction Statistics (Phase 3)', () => {
+  const senders = ['Her', 'Him'];
+
+  // Construct realistic messages with reactions
+  const msgsWithReactions = [
+    // Msg 1: sent by Her, reacted by Him with ❤️
+    {
+      id: 'm1',
+      sender: 'Her',
+      timestamp: new Date('2024-10-01T10:00:00'),
+      text: 'Good morning!',
+      meta: {
+        reactions: [{ emoji: '❤️', reaction: '❤️', actor: 'Him', sender: 'Him', timestamp: new Date('2024-10-01T10:02:00') }],
+      },
+    },
+    // Msg 2: sent by Her, reacted by Him with ❤️ AND 😂 (duplicates/multiple reactions from Him -> deduped to 1)
+    {
+      id: 'm2',
+      sender: 'Her',
+      timestamp: new Date('2024-10-01T11:00:00'),
+      text: 'Look at this funny photo',
+      meta: {
+        reactions: [
+          { emoji: '❤️', reaction: '❤️', actor: 'Him', sender: 'Him', timestamp: new Date('2024-10-01T11:05:00') },
+          { emoji: '😂', reaction: '😂', actor: 'Him', sender: 'Him', timestamp: new Date('2024-10-01T11:06:00') },
+        ],
+      },
+    },
+    // Msg 3: sent by Her, NO reactions from Him (but Her self-reacted with 🔥)
+    {
+      id: 'm3',
+      sender: 'Her',
+      timestamp: new Date('2024-10-01T12:00:00'),
+      text: 'Outfit check',
+      meta: {
+        reactions: [{ emoji: '🔥', reaction: '🔥', actor: 'Her', sender: 'Her' }],
+      },
+    },
+    // Msg 4: sent by Her, NO reactions
+    {
+      id: 'm4',
+      sender: 'Her',
+      timestamp: new Date('2024-10-01T13:00:00'),
+      text: 'Where are you?',
+      meta: {},
+    },
+    // Msg 5: sent by Him, reacted by Her with 😍
+    {
+      id: 'm5',
+      sender: 'Him',
+      timestamp: new Date('2024-10-01T14:00:00'),
+      text: 'Here is your coffee',
+      meta: {
+        reactions: [{ emoji: '😍', reaction: '😍', actor: 'Her', sender: 'Her', timestamp: new Date('2024-10-01T14:01:00') }],
+      },
+    },
+    // Msg 6: sent by Him, NO reactions
+    {
+      id: 'm6',
+      sender: 'Him',
+      timestamp: new Date('2024-10-01T15:00:00'),
+      text: 'Working now',
+      meta: {},
+    },
+  ];
+
+  test('ChatMessage exposes reactions getter matching meta.reactions without drift', () => {
+    const raw = {
+      id: 'test-1',
+      sender: 'Her',
+      timestamp: new Date(),
+      text: 'hello',
+      meta: {
+        reactions: [{ emoji: '❤️', actor: 'Him', sender: 'Him' }],
+      },
+    };
+    const parsed = applyNicknameMapping([raw], { Her: 'Aru', Him: 'Avu' });
+    assert.equal(parsed[0].sender, 'Aru');
+    assert.equal(parsed[0].reactions.length, 1);
+    assert.equal(parsed[0].reactions[0].actor, 'Avu');
+    assert.equal(parsed[0].reactions[0].sender, 'Avu');
+    // Verify getter returns meta.reactions
+    assert.strictEqual(parsed[0].reactions, parsed[0].meta.reactions);
+  });
+
+  test('calculates total reactions sent per person', () => {
+    const stats = getReactionStats(msgsWithReactions, senders);
+    // Her sent reactions:
+    // - msg 3: 🔥 (self-reaction, counted in total sent)
+    // - msg 5: 😍
+    // Total sent by Her = 2
+    assert.equal(stats.reactionsSent.Her.count, 2);
+
+    // Him sent reactions:
+    // - msg 1: ❤️
+    // - msg 2: 😂 (after deduping multiple reactions on msg 2)
+    // Total sent by Him = 2
+    assert.equal(stats.reactionsSent.Him.count, 2);
+
+    assert.equal(stats.totalReactionsSent, 4);
+  });
+
+  test('calculates reaction rate excluding self-reactions and duplicate reactions', () => {
+    const stats = getReactionStats(msgsWithReactions, senders);
+
+    // Total messages sent:
+    // Her sent 4 messages: m1, m2, m3, m4.
+    // Messages of Her receiving at least one reaction from Him:
+    // - m1: YES (Him reacted ❤️)
+    // - m2: YES (Him reacted 😂)
+    // - m3: NO (Her self-reacted 🔥, but Him did not react!)
+    // - m4: NO
+    // -> 2 of 4 messages received reactions from Him = 50.0%
+    assert.equal(stats.reactionRates.Her.totalMessages, 4);
+    assert.equal(stats.reactionRates.Her.messagesReacted, 2);
+    assert.equal(stats.reactionRates.Her.rate, 50.0);
+
+    // Him sent 2 messages: m5, m6.
+    // Messages of Him receiving reaction from Her:
+    // - m5: YES (Her reacted 😍)
+    // - m6: NO
+    // -> 1 of 2 messages received reaction from Her = 50.0%
+    assert.equal(stats.reactionRates.Him.totalMessages, 2);
+    assert.equal(stats.reactionRates.Him.messagesReacted, 1);
+    assert.equal(stats.reactionRates.Him.rate, 50.0);
+  });
+
+  test('identifies most-used reaction emoji per person sent to the other', () => {
+    const stats = getReactionStats(msgsWithReactions, senders);
+    // Her reacting to Him: sent 😍 on m5
+    assert.equal(stats.topEmoji.Her.emoji, '😍');
+    assert.equal(stats.topEmoji.Her.count, 1);
+
+    // Him reacting to Her: sent 😂 on m2 (latest deduped reaction) and ❤️ on m1
+    assert.ok(stats.topEmoji.Him.emoji === '❤️' || stats.topEmoji.Him.emoji === '😂');
+    assert.ok(stats.comparison.rows.length >= 2);
+  });
+
+  test('computes reaction latency when timestamps are present', () => {
+    const stats = getReactionStats(msgsWithReactions, senders);
+    assert.equal(stats.timing.hasReactionTimestamps, true);
+
+    // Her reacted on m5: m5 was at 14:00, reaction at 14:01 -> 1 min (60,000 ms)
+    assert.equal(stats.timing.Her.fastestMs, 60000);
+    assert.equal(stats.timing.Her.formattedFastest, '~1 min');
+
+    // Him reacted on m1 (2 mins) and m2 (6 mins)
+    assert.equal(stats.timing.Him.fastestMs, 120000); // 2 mins
+    assert.equal(stats.timing.Him.formattedFastest, '~2 min');
+  });
+
+  test('cleanly sets hasReactionTimestamps false when reaction timestamps are absent', () => {
+    const msgsNoTimestamps = [
+      {
+        id: '1',
+        sender: 'Her',
+        timestamp: new Date('2024-10-01'),
+        meta: {
+          reactions: [{ emoji: '❤️', actor: 'Him', sender: 'Him' }], // No timestamp property
+        },
+      },
+      {
+        id: '2',
+        sender: 'Him',
+        timestamp: new Date('2024-10-01'),
+        meta: {
+          reactions: [{ emoji: '❤️', actor: 'Her', sender: 'Her' }], // No timestamp property
+        },
+      },
+    ];
+
+    const stats = getReactionStats(msgsNoTimestamps, senders);
+    assert.equal(stats.timing.hasReactionTimestamps, false);
+    assert.equal(stats.timing.Her.avgMs, null);
+    assert.equal(stats.timing.Him.avgMs, null);
+  });
+});
+
+describe('Cross-Platform Unification Statistics (Phase 4)', () => {
+  const sampleWhatsAppText = `12/08/2021, 10:15 - Aru: hey avu!\n12/08/2021, 10:16 - Avu: hey aru, what's up?`;
+  const sampleTelegramJson = {
+    messages: [
+      { id: 1, type: 'message', date: '2022-03-01T14:00:00', from: 'Aru', text: 'telegram is cool' },
+      { id: 2, type: 'message', date: '2022-03-01T14:05:00', from: 'Avu', text: 'yeah faster stickers' },
+    ],
+  };
+  const sampleInstagramJson = {
+    participants: [{ name: 'Aru' }, { name: 'Avu' }],
+    messages: [
+      {
+        sender_name: 'Avu',
+        timestamp_ms: new Date('2023-06-15T20:00:00Z').getTime(),
+        content: 'look at this reel',
+        share: { link: 'https://instagram.com/reel/xyz123' },
+      },
+      {
+        sender_name: 'Aru',
+        timestamp_ms: new Date('2023-06-15T20:05:00Z').getTime(),
+        content: 'so funny haha',
+      },
+    ],
+  };
+
+  test('message tagging with platform across WhatsApp, Telegram, and Instagram parsers', () => {
+    const wa = parseWhatsApp(sampleWhatsAppText);
+    assert.equal(wa.messages[0].platform, 'whatsapp');
+    assert.equal(wa.messages[1].platform, 'whatsapp');
+
+    const tg = parseTelegramJson(sampleTelegramJson);
+    assert.equal(tg.messages[0].platform, 'telegram');
+    assert.equal(tg.messages[1].platform, 'telegram');
+
+    const ig = parseInstagramJson(sampleInstagramJson);
+    assert.equal(ig.messages[0].platform, 'instagram');
+    assert.equal(ig.messages[1].platform, 'instagram');
+
+    // Check applyNicknameMapping preserves platform
+    const mapped = applyNicknameMapping(wa.messages, { Aru: 'Her', Avu: 'Him' });
+    assert.equal(mapped[0].platform, 'whatsapp');
+    assert.equal(mapped[0].sender, 'Her');
+  });
+
+  test('parseChatFiles groups mixed multi-platform batches', async () => {
+    const waFile = {
+      name: '_chat.txt',
+      text: async () => sampleWhatsAppText,
+    };
+    const igFile = {
+      name: 'message_1.json',
+      text: async () => JSON.stringify(sampleInstagramJson),
+    };
+
+    const res = await parseChatFiles([waFile, igFile]);
+    assert.equal(res.multiPlatform, true);
+    assert.equal(res.platforms.length, 2);
+    assert.equal(res.platforms[0].platform, 'whatsapp');
+    assert.equal(res.platforms[1].platform, 'instagram');
+  });
+
+  test('computes unified relationship timeline, absolute first message, and busiest day across platforms', () => {
+    const mixedMessages = [
+      // Earliest ever: WhatsApp on 2021-08-12
+      {
+        id: 'wa-1',
+        sender: 'Her',
+        timestamp: new Date('2021-08-12T10:15:00'),
+        text: 'hello from whatsapp!',
+        platform: 'whatsapp',
+        type: 'text',
+      },
+      {
+        id: 'wa-2',
+        sender: 'Him',
+        timestamp: new Date('2021-08-12T10:20:00'),
+        text: 'hey there!',
+        platform: 'whatsapp',
+        type: 'text',
+      },
+      // Telegram in 2022
+      {
+        id: 'tg-1',
+        sender: 'Her',
+        timestamp: new Date('2022-02-14T11:00:00'),
+        text: 'happy valentines day!',
+        platform: 'telegram',
+        type: 'text',
+      },
+      {
+        id: 'tg-2',
+        sender: 'Him',
+        timestamp: new Date('2022-02-14T11:05:00'),
+        text: 'happy valentines!! ❤️',
+        platform: 'telegram',
+        type: 'text',
+      },
+      // Instagram on same day 2022-02-14 making it the busiest day (4 messages)
+      {
+        id: 'ig-1',
+        sender: 'Her',
+        timestamp: new Date('2022-02-14T18:00:00'),
+        text: 'check this out',
+        platform: 'instagram',
+        type: 'text',
+      },
+      {
+        id: 'ig-2',
+        sender: 'Him',
+        timestamp: new Date('2022-02-14T18:30:00'),
+        text: 'aww lovely',
+        platform: 'instagram',
+        type: 'text',
+      },
+      // Instagram later in 2023
+      {
+        id: 'ig-3',
+        sender: 'Her',
+        timestamp: new Date('2023-05-01T09:00:00'),
+        text: 'good morning',
+        platform: 'instagram',
+        type: 'text',
+      },
+    ];
+
+    const stats = getCrossPlatformStats(mixedMessages);
+
+    // Platform breakdown
+    assert.equal(stats.isMultiPlatform, true);
+    assert.equal(stats.totalMessages, 7);
+    assert.deepEqual(stats.activePlatforms.sort(), ['instagram', 'telegram', 'whatsapp']);
+    assert.equal(stats.platformBreakdown.length, 3);
+    const igBreakdown = stats.platformBreakdown.find((p) => p.platform === 'instagram');
+    assert.equal(igBreakdown.color, '#8A2BE2');
+
+    // Absolute first message ever
+    assert.ok(stats.firstMessage);
+    assert.equal(stats.firstMessage.id, 'wa-1');
+    assert.equal(stats.firstMessage.platform, 'whatsapp');
+    assert.equal(stats.firstMessage.sender, 'Her');
+    assert.equal(stats.firstMessage.text, 'hello from whatsapp!');
+
+    // Busiest day combined
+    assert.ok(stats.busiestDay);
+    assert.equal(stats.busiestDay.dateKey, '2022-02-14');
+    assert.equal(stats.busiestDay.total, 4);
+    assert.equal(stats.busiestDay.breakdown.telegram, 2);
+    assert.equal(stats.busiestDay.breakdown.instagram, 2);
+    assert.equal(stats.busiestDay.breakdown.whatsapp, 0);
+    assert.equal(stats.busiestDay.shares.telegram, 50);
+    assert.equal(stats.busiestDay.shares.instagram, 50);
+
+    // Platform migration timeline
+    assert.ok(stats.migrationTimeline.length >= 3);
+    const aug21 = stats.migrationTimeline.find((m) => m.monthKey === '2021-08');
+    assert.ok(aug21);
+    assert.equal(aug21.whatsapp, 2);
+    assert.equal(aug21.dominantPlatform, 'whatsapp');
+
+    const feb22 = stats.migrationTimeline.find((m) => m.monthKey === '2022-02');
+    assert.ok(feb22);
+    assert.equal(feb22.total, 4);
+
+    const may23 = stats.migrationTimeline.find((m) => m.monthKey === '2023-05');
+    assert.ok(may23);
+    assert.equal(may23.instagram, 1);
+    assert.equal(may23.dominantPlatform, 'instagram');
+
+    // Migration narrative
+    assert.ok(stats.migrationNarrative.includes('WhatsApp'));
+    assert.ok(stats.migrationNarrative.includes('Instagram'));
+  });
+
+  test('graceful degradation when only 1 platform is loaded', () => {
+    const singlePlatformMsgs = [
+      {
+        id: 'wa-1',
+        sender: 'Her',
+        timestamp: new Date('2023-01-01T12:00:00'),
+        text: 'hello world',
+        platform: 'whatsapp',
+        type: 'text',
+      },
+      {
+        id: 'wa-2',
+        sender: 'Him',
+        timestamp: new Date('2023-01-01T12:05:00'),
+        text: 'hey!',
+        platform: 'whatsapp',
+        type: 'text',
+      },
+    ];
+
+    const stats = getCrossPlatformStats(singlePlatformMsgs);
+    assert.equal(stats.isMultiPlatform, false);
+    assert.deepEqual(stats.activePlatforms, ['whatsapp']);
+    assert.equal(stats.totalMessages, 2);
+    assert.ok(stats.firstMessage);
+    assert.equal(stats.firstMessage.platform, 'whatsapp');
+    assert.ok(stats.busiestDay);
+    assert.equal(stats.busiestDay.total, 2);
+    assert.ok(stats.migrationNarrative.includes('WhatsApp'));
+  });
+
+  test('WhatsApp messages containing reel links in text do not have type reel_share and produce 0 reels', () => {
+    const waText = [
+      '01/01/2024, 10:00 - Aru: Check out this funny reel https://www.instagram.com/reel/C3abc123/',
+      '01/01/2024, 10:05 - Avu: haha so cute!',
+    ].join('\n');
+
+    const parsed = parseWhatsApp(waText);
+    assert.equal(parsed.messages.length, 2);
+    // WhatsApp parser must not tag plain text link as reel_share
+    assert.ok(parsed.messages.every((m) => m.type !== 'reel_share'));
+    const reelStats = getReelStats(parsed.messages, ['Aru', 'Avu']);
+    assert.equal(reelStats.totalReels, 0);
+  });
+});
+
+

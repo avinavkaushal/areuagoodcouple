@@ -124,6 +124,22 @@ export function resolveSenderMapping(rawSenders = [], storedConfig = getStoredNi
     };
   }
 
+  // Aru (Her) & Avu (Him) heuristics
+  if (s1Lower.includes('aru') || s2Lower.includes('avu')) {
+    return {
+      her: s1,
+      him: s2,
+      mapping: { [s1]: 'Her', [s2]: 'Him' },
+    };
+  }
+  if (s1Lower.includes('avu') || s2Lower.includes('aru')) {
+    return {
+      her: s2,
+      him: s1,
+      mapping: { [s2]: 'Her', [s1]: 'Him' },
+    };
+  }
+
   // Default: first sender is Her, second is Him
   return {
     her: s1,

@@ -5,6 +5,9 @@ function SettingsModal({
   isOpen,
   onClose,
   platform,
+  loadedPlatforms = {},
+  onAddPlatform,
+  onRemovePlatform,
   rawSenders,
   currentMapping,
   onSaveMapping,
@@ -47,6 +50,9 @@ function SettingsModal({
     onClose();
   };
 
+  const platformKeys = Object.keys(loadedPlatforms || {});
+  const hasLoadedPlatforms = platformKeys.length > 0;
+
   return (
     <div
       role="dialog"
@@ -55,7 +61,7 @@ function SettingsModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md glass border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative select-none"
+        className="w-full max-w-md glass border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative select-none max-h-[90vh] overflow-y-auto scrollbar-thin"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Close icon button */}
@@ -72,30 +78,75 @@ function SettingsModal({
 
         {/* Header */}
         <h3 className="font-serif text-xl sm:text-2xl text-cloud font-semibold mb-1">
-          Chat &amp; Nickname Settings
+          Chat &amp; Platform Settings
         </h3>
-        <p className="font-sans text-xs text-cloud/60 mb-6">
-          Map your chat&apos;s export names to Her &amp; Him
+        <p className="font-sans text-xs text-cloud/60 mb-5">
+          Manage your connected chat platforms and nicknames
         </p>
 
-        {/* Platform Badge */}
-        <div className="flex items-center gap-2 mb-6">
-          <span className="text-xs text-cloud/50 font-sans">Active Chat:</span>
-          {platform === 'telegram' ? (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-medium">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z"/>
-              </svg>
-              Telegram Export
+        {/* Connected Platforms List */}
+        <div className="mb-6 p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="font-sans text-xs uppercase tracking-wider text-pink font-semibold">
+              Connected Platforms
             </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-medium">
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.81 13.47 3.81 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z"/>
-              </svg>
-              WhatsApp Export
-            </span>
-          )}
+            {onAddPlatform && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onAddPlatform();
+                }}
+                className="text-[11px] text-pink hover:text-blush underline cursor-pointer font-medium"
+              >
+                + Add Another
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            {hasLoadedPlatforms ? (
+              platformKeys.map((pKey) => {
+                const pData = loadedPlatforms[pKey];
+                const msgCount = (pData?.messages || []).filter((m) => m.type !== 'system').length;
+                return (
+                  <div
+                    key={pKey}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-night/60 border border-white/5"
+                  >
+                    <div className="flex items-center gap-2">
+                      {pKey === 'instagram' ? (
+                        <span className="w-2.5 h-2.5 rounded-full bg-pink" />
+                      ) : pKey === 'telegram' ? (
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#2AABEE]" />
+                      ) : (
+                        <span className="w-2.5 h-2.5 rounded-full bg-[#25D366]" />
+                      )}
+                      <span className="text-xs font-medium text-cloud capitalize">
+                        {pKey === 'instagram' ? 'Instagram' : pKey === 'telegram' ? 'Telegram' : 'WhatsApp'}
+                      </span>
+                      <span className="text-[11px] text-cloud/50">({msgCount.toLocaleString()} msgs)</span>
+                    </div>
+
+                    {platformKeys.length > 1 && onRemovePlatform && (
+                      <button
+                        type="button"
+                        onClick={() => onRemovePlatform(pKey)}
+                        className="text-[11px] text-red-400/70 hover:text-red-300 px-2 py-0.5 rounded hover:bg-red-500/10 cursor-pointer"
+                        title={`Remove ${pKey}`}
+                      >
+                        Remove
+                      </button>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-xs text-cloud/60 capitalize">
+                Active: {platform || 'WhatsApp'}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Dropdowns */}

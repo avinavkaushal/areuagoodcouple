@@ -28,6 +28,20 @@ function Milestones({ messages, senders }) {
     return () => ctx.revert();
   }, []);
 
+  const platformSources = useMemo(() => {
+    const set = new Set();
+    for (const m of messages || []) {
+      if (m && m.type !== 'system' && m.platform) {
+        set.add(m.platform);
+      }
+    }
+    return Array.from(set).map((p) =>
+      p === 'instagram' ? 'Instagram' : p === 'telegram' ? 'Telegram' : 'WhatsApp'
+    );
+  }, [messages]);
+
+  const hasMultipleSources = platformSources.length > 1;
+
   return (
     <section
       id="milestones"
@@ -37,14 +51,34 @@ function Milestones({ messages, senders }) {
       <div className="relative z-10 max-w-3xl">
         <p className="font-sans text-blush/70 text-sm mb-4 sm:mb-8">our biggest marks</p>
 
-        <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug mb-10 sm:mb-14">
+        <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug mb-6 sm:mb-8">
           every milestone, counted.
         </p>
+
+        {/* Source Unification Badge */}
+        {hasMultipleSources && (
+          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.06] border border-white/15 backdrop-blur-md text-xs font-sans text-cloud/80 mb-10 shadow-sm animate-fade-in">
+            <span className="w-2 h-2 rounded-full bg-pink animate-pulse" />
+            <span>
+              Combined across all sources:{' '}
+              <strong className="text-cloud font-semibold">
+                {platformSources.join(' + ')}
+              </strong>
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {/* Card 1: Total Messages */}
           <div className="milestone-card glass rounded-2xl p-6">
-            <span className="font-sans text-cloud/60 text-xs">Total Conversations</span>
+            <div className="flex items-center justify-between">
+              <span className="font-sans text-cloud/60 text-xs">Total Conversations</span>
+              {hasMultipleSources && (
+                <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-white/10 text-pink font-medium">
+                  Combined Sources
+                </span>
+              )}
+            </div>
             <div className="font-serif font-semibold text-pink text-4xl sm:text-5xl my-2">
               {stats.totalMessages.toLocaleString()}
             </div>

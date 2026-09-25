@@ -1,26 +1,57 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 
 const NAV_ITEMS = [
+  { id: 'unified', label: 'Unified' },
   { id: 'milestones', label: 'Milestones' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'highlights', label: 'Highlights' },
+  { id: 'reels', label: 'Reels' },
+  { id: 'media-breakdown', label: 'Media' },
   { id: 'activity', label: 'Activity' },
   { id: 'initiator', label: 'Initiator' },
   { id: 'response-time', label: 'Response Time' },
   { id: 'love-words', label: 'Love Words' },
   { id: 'search', label: 'Search' },
   { id: 'emoji', label: 'Emoji' },
+  { id: 'reactions', label: 'Reactions' },
   { id: 'word-cloud', label: 'Word Cloud' },
   { id: 'memories', label: 'Memories' },
   { id: 'streaks', label: 'Streaks' },
   { id: 'longest-message', label: 'Longest' },
 ];
 
-function QuickNav({ onOpenSettings }) {
+function QuickNav({ messages, onOpenSettings }) {
   const [activeId, setActiveId] = useState('milestones');
   const isClickScrolling = useRef(false);
   const clickTimeout = useRef(null);
   const navContainerRef = useRef(null);
+
+  // Filter NAV_ITEMS so features without data (e.g. reels/media/reactions on WhatsApp-only chats) don't clutter nav
+  const navItems = useMemo(() => {
+    const hasReels = (messages || []).some((m) => m?.type === 'reel_share');
+
+    const hasMedia = (messages || []).some(
+      (m) =>
+        m?.type === 'photo' ||
+        m?.type === 'video' ||
+        m?.type === 'story_reply' ||
+        (Array.isArray(m?.meta?.photos) && m.meta.photos.length > 0) ||
+        (Array.isArray(m?.meta?.videos) && m.meta.videos.length > 0)
+    );
+
+    const hasReactions = (messages || []).some(
+      (m) =>
+        (m?.reactions && m.reactions.length > 0) ||
+        (m?.meta?.reactions && m.meta.reactions.length > 0)
+    );
+
+    return NAV_ITEMS.filter((item) => {
+      if (item.id === 'reels' && !hasReels) return false;
+      if (item.id === 'media-breakdown' && !hasMedia) return false;
+      if (item.id === 'reactions' && !hasReactions) return false;
+      return true;
+    });
+  }, [messages]);
 
   // Smoothly center the active pill in the horizontal nav on small screens
   useEffect(() => {
@@ -53,8 +84,8 @@ function QuickNav({ onOpenSettings }) {
 
           let currentId = null;
 
-          for (let i = 0; i < NAV_ITEMS.length; i++) {
-            const item = NAV_ITEMS[i];
+          for (let i = 0; i < navItems.length; i++) {
+            const item = navItems[i];
             const el = document.getElementById(item.id);
             if (el) {
               const rect = el.getBoundingClientRect();
@@ -79,7 +110,7 @@ function QuickNav({ onOpenSettings }) {
       window.removeEventListener('scroll', onScroll);
       if (clickTimeout.current) clearTimeout(clickTimeout.current);
     };
-  }, []);
+  }, [navItems]);
 
   const scrollTo = (id) => {
     const el = document.getElementById(id);
@@ -107,7 +138,7 @@ function QuickNav({ onOpenSettings }) {
           ref={navContainerRef}
           className="flex items-center gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1"
         >
-          {NAV_ITEMS.map(({ id, label }) => {
+          {navItems.map(({ id, label }) => {
             const isActive = activeId === id;
             return (
               <button

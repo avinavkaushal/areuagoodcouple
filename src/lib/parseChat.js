@@ -38,7 +38,7 @@ function parseDateTime(d, m, y, h, min, sec, ampm) {
 /**
  * Creates a normalized ChatMessage object with both .timestamp and .date getters
  */
-export function createChatMessage({ id, sender, timestamp, text, type, _rawSender, meta }) {
+export function createChatMessage({ id, sender, timestamp, text, type, _rawSender, meta, platform }) {
   const ts = timestamp instanceof Date ? timestamp : new Date(timestamp);
   const msg = {
     id: String(id),
@@ -46,6 +46,7 @@ export function createChatMessage({ id, sender, timestamp, text, type, _rawSende
     timestamp: ts,
     text: text || '',
     type: type || 'text',
+    ...(platform ? { platform } : {}),
     ...(meta ? { meta } : {}),
     ...(_rawSender ? { _rawSender } : {}),
   };
@@ -57,6 +58,27 @@ export function createChatMessage({ id, sender, timestamp, text, type, _rawSende
     },
     set(val) {
       this.timestamp = val instanceof Date ? val : new Date(val);
+    },
+    enumerable: true,
+    configurable: true,
+  });
+
+  // Provide reactions property pointing directly to meta.reactions (single source of truth)
+  Object.defineProperty(msg, 'reactions', {
+    get() {
+      return this.meta?.reactions || [];
+    },
+    enumerable: true,
+    configurable: true,
+  });
+
+  // Provide content alias pointing to text
+  Object.defineProperty(msg, 'content', {
+    get() {
+      return this.text || null;
+    },
+    set(val) {
+      this.text = val || '';
     },
     enumerable: true,
     configurable: true,
@@ -205,6 +227,7 @@ export function parseTelegramJson(json, nicknameMap = {}) {
       type,
       _rawSender: rawSender,
       meta,
+      platform: 'telegram',
     });
 
     messages.push(message);
@@ -267,6 +290,7 @@ export function parseWhatsApp(text, nicknameMap = {}) {
           text: msg,
           type,
           _rawSender: rawSender,
+          platform: 'whatsapp',
         });
 
         messages.push(chatMsg);
@@ -302,14 +326,19 @@ export function applyNicknameMapping(messages, mapping = {}) {
     if (m.meta?.reactions) {
       updatedMeta = {
         ...m.meta,
-        reactions: m.meta.reactions.map((r) => ({
-          ...r,
-          ...(r.sender ? { sender: mapping[r.sender] || r.sender } : {}),
-        })),
+        reactions: m.meta.reactions.map((r) => {
+          const rawActor = r._rawActor || r.actor || r.sender;
+          const mapped = mapping[rawActor] || mapping[r.actor] || mapping[r.sender] || r.actor || r.sender;
+          return {
+            ...r,
+            sender: mapped,
+            actor: mapped,
+          };
+        }),
       };
     }
 
-    return createChatMessage({
+    const newMsg = createChatMessage({
       id: m.id,
       sender: newSender,
       timestamp: m.timestamp,
@@ -317,15 +346,255 @@ export function applyNicknameMapping(messages, mapping = {}) {
       type: m.type,
       _rawSender: raw,
       meta: updatedMeta,
+      platform: m.platform,
     });
+    newMsg.content = newMsg.text || null;
+    return newMsg;
   });
+}
+
+export function fixMojibake(str) {
+  if (typeof str !== 'string' || !str) return str;
+
+  let hasHighByte = false;
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    if (code > 255) {
+      // String already has genuine multi-byte Unicode code points
+      return str;
+    }
+    if (code >= 0x80) {
+      hasHighByte = true;
+    }
+  }
+
+  // Pure ASCII doesn't need re-decoding
+  if (!hasHighByte) {
+    return str;
+  }
+
+  try {
+    const bytes = new Uint8Array(str.length);
+    for (let i = 0; i < str.length; i++) {
+      bytes[i] = str.charCodeAt(i);
+    }
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return str;
+  }
+}
+
+/**
+ * Check if an Instagram message is unsent / deleted or empty ghost entry
+ */
+function isDeletedOrUnsent(m, decodedContent) {
+  if (m.is_unsent === true) return true;
+  const hasPhotos = Array.isArray(m.photos) && m.photos.length > 0;
+  const hasVideos = Array.isArray(m.videos) && m.videos.length > 0;
+  const hasAudio = Array.isArray(m.audio_files) && m.audio_files.length > 0;
+  const hasShare = Boolean(m.share && (m.share.link || m.share.share_text));
+  const hasMedia = hasPhotos || hasVideos || hasAudio || hasShare;
+
+  const text = (decodedContent || '').trim();
+  // Empty content with no media/share
+  if (!hasMedia && !text) return true;
+  // Instagram unsent placeholder text
+  if (!hasMedia && /^(you unsent a message|unsent a message|this message was unsent)$/i.test(text)) {
+    return true;
+  }
+  return false;
+}
+
+function deriveInstagramMessageType(m, decodedContent) {
+  const shareLink = (m.share?.link || '').toLowerCase();
+  const text = (decodedContent || '').trim();
+
+  // 1. Reel share: share link contains /reel/ or /reels/
+  if (shareLink && (shareLink.includes('/reel/') || shareLink.includes('/reels/'))) {
+    return 'reel_share';
+  }
+
+  const isStoryLink = shareLink && shareLink.includes('/stories/');
+  const isStoryText = /^(replied to (their|your) story|reacted to (their|your) story)/i.test(text);
+  if (isStoryLink || isStoryText || m.story_share) {
+    return 'story_reply';
+  }
+
+  // 3. Photos: message contains photos array, no share/reel link
+  if (Array.isArray(m.photos) && m.photos.length > 0 && m.photos.some((p) => p && p.uri)) {
+    return 'photo';
+  }
+
+  // 4. Videos: message contains videos array, no share/reel link
+  if (Array.isArray(m.videos) && m.videos.length > 0 && m.videos.some((v) => v && v.uri)) {
+    return 'video';
+  }
+
+  // 5. Fallback media
+  if ((Array.isArray(m.audio_files) && m.audio_files.length > 0) || shareLink) {
+    return 'media';
+  }
+
+  return 'text';
+}
+
+/**
+ * Parse Instagram DM JSON export (single or multiple message_N.json files)
+ * @param {object|string|Array<object|string>} jsonOrArray
+ * @param {Record<string, 'Her' | 'Him' | string>} [nicknameMap={}]
+ * @returns {{ platform: 'instagram', messages: ChatMessage[], senders: string[], rawSenders: string[] }}
+ */
+export function parseInstagramJson(jsonOrArray, nicknameMap = {}) {
+  const inputs = Array.isArray(jsonOrArray) ? jsonOrArray : [jsonOrArray];
+  const allRawMessages = [];
+  const rawSenderSet = new Set();
+
+  for (const input of inputs) {
+    const data = typeof input === 'string' ? JSON.parse(input) : input;
+    if (!data) continue;
+
+    // Collect participants if present
+    if (Array.isArray(data.participants)) {
+      for (const p of data.participants) {
+        if (p && p.name) {
+          const fixedName = fixMojibake(p.name).trim();
+          if (fixedName) rawSenderSet.add(fixedName);
+        }
+      }
+    }
+
+    if (Array.isArray(data.messages)) {
+      allRawMessages.push(...data.messages);
+    }
+  }
+
+  if (allRawMessages.length === 0) {
+    throw new Error('Invalid Instagram export: no messages found.');
+  }
+
+  // Deduplicate messages across paginated files by sender + timestamp_ms + content + share.link
+  const seenKeys = new Set();
+  const dedupedMessages = [];
+
+  for (const m of allRawMessages) {
+    if (!m) continue;
+    const rawSender = fixMojibake(m.sender_name || 'unknown').trim();
+    if (rawSender && rawSender !== 'unknown') {
+      rawSenderSet.add(rawSender);
+    }
+
+    const decodedContent = fixMojibake(m.content);
+
+    // Filter out unsent / deleted messages
+    if (isDeletedOrUnsent(m, decodedContent)) {
+      continue;
+    }
+
+    const ts = Number(m.timestamp_ms) || 0;
+    const shareLink = m.share?.link || '';
+    const dedupeKey = `${rawSender}|${ts}|${decodedContent || ''}|${shareLink}`;
+    if (seenKeys.has(dedupeKey)) {
+      continue;
+    }
+    seenKeys.add(dedupeKey);
+
+    dedupedMessages.push({
+      raw: m,
+      rawSender,
+      decodedContent,
+      timestamp_ms: ts,
+    });
+  }
+
+  // Sort chronologically ascending by timestamp_ms
+  dedupedMessages.sort((a, b) => a.timestamp_ms - b.timestamp_ms);
+
+  const rawSenders = Array.from(rawSenderSet);
+  const messages = [];
+
+  for (let i = 0; i < dedupedMessages.length; i++) {
+    const { raw: m, rawSender, decodedContent, timestamp_ms } = dedupedMessages[i];
+    const mappedSender = nicknameMap[rawSender] || rawSender;
+    const timestamp = new Date(timestamp_ms);
+    const type = deriveInstagramMessageType(m, decodedContent);
+
+    // Parse reactions attached to message
+    let reactions = undefined;
+    if (Array.isArray(m.reactions) && m.reactions.length > 0) {
+      reactions = m.reactions
+        .map((r) => {
+          const emoji = fixMojibake(r.reaction);
+          const actorRaw = fixMojibake(r.actor);
+          const actorMapped = actorRaw ? nicknameMap[actorRaw] || actorRaw : undefined;
+          let reactionDate = undefined;
+          if (r.timestamp_ms) {
+            reactionDate = new Date(Number(r.timestamp_ms));
+          } else if (r.timestamp) {
+            const rawTs = Number(r.timestamp);
+            reactionDate = new Date(rawTs > 1e11 ? rawTs : rawTs * 1000);
+          }
+          const hasValidDate = reactionDate && !isNaN(reactionDate.getTime());
+
+          return {
+            emoji,
+            reaction: emoji,
+            sender: actorMapped,
+            actor: actorMapped,
+            _rawActor: actorRaw,
+            ...(hasValidDate ? { timestamp: reactionDate } : {}),
+          };
+        })
+        .filter((r) => Boolean(r.emoji));
+      if (reactions.length === 0) reactions = undefined;
+    }
+
+    // Filter broken photos/videos in meta
+    const validPhotos = Array.isArray(m.photos)
+      ? m.photos.filter((p) => p && typeof p.uri === 'string' && p.uri.trim() !== '')
+      : undefined;
+    const validVideos = Array.isArray(m.videos)
+      ? m.videos.filter((v) => v && typeof v.uri === 'string' && v.uri.trim() !== '')
+      : undefined;
+
+    const meta = {
+      ...(reactions ? { reactions } : {}),
+      ...(m.share ? { share: m.share, reelLink: m.share.link } : {}),
+      ...(validPhotos && validPhotos.length > 0 ? { photos: validPhotos } : {}),
+      ...(validVideos && validVideos.length > 0 ? { videos: validVideos } : {}),
+      ...(type === 'story_reply' ? { isStoryReply: true } : {}),
+    };
+
+    const chatMsg = createChatMessage({
+      id: `ig-${timestamp_ms}-${i}`,
+      sender: mappedSender,
+      timestamp,
+      text: decodedContent || '',
+      type,
+      _rawSender: rawSender,
+      meta: Object.keys(meta).length > 0 ? meta : undefined,
+      platform: 'instagram',
+    });
+
+    chatMsg.content = chatMsg.text || null;
+
+    messages.push(chatMsg);
+  }
+
+  const mappedSenders = rawSenders.map((s) => nicknameMap[s] || s);
+
+  return {
+    platform: 'instagram',
+    messages,
+    senders: mappedSenders,
+    rawSenders,
+  };
 }
 
 /**
  * Detect platform format from text and optional filename
  * @param {string} text
  * @param {string} [fileName='']
- * @returns {{ platform: 'whatsapp' | 'telegram' | null, data?: any }}
+ * @returns {{ platform: 'whatsapp' | 'telegram' | 'instagram' | null, data?: any }}
  */
 export function detectPlatform(text, fileName = '') {
   if (typeof text !== 'string') return { platform: null };
@@ -333,12 +602,29 @@ export function detectPlatform(text, fileName = '') {
   const trimmed = text.trim();
   const lowerName = (fileName || '').toLowerCase();
 
-  // Telegram JSON detection: filename ends with .json or content looks like JSON with top-level messages array
-  if (lowerName.endsWith('.json') || trimmed.startsWith('{')) {
+  // JSON detection
+  if (lowerName.endsWith('.json') || trimmed.startsWith('{') || trimmed.startsWith('[')) {
     try {
       const parsed = JSON.parse(trimmed);
-      if (parsed && Array.isArray(parsed.messages)) {
-        return { platform: 'telegram', data: parsed };
+      const isArray = Array.isArray(parsed);
+      const obj = isArray ? parsed[0] : parsed;
+
+      if (obj && typeof obj === 'object') {
+        // Instagram detection:
+        // Has participants array or messages with sender_name or timestamp_ms
+        if (
+          Array.isArray(obj.participants) ||
+          (Array.isArray(obj.messages) &&
+            obj.messages.some((m) => m && ('sender_name' in m || 'timestamp_ms' in m)))
+        ) {
+          return { platform: 'instagram', data: parsed };
+        }
+
+        // Telegram detection:
+        // Has top-level messages array (or type: personal_chat / id)
+        if (Array.isArray(obj.messages)) {
+          return { platform: 'telegram', data: parsed };
+        }
       }
     } catch {
       // not valid JSON, fall through to check WhatsApp
@@ -357,30 +643,121 @@ export function detectPlatform(text, fileName = '') {
   return { platform: null };
 }
 
+async function readFileText(file) {
+  if (typeof file.text === 'function') {
+    return await file.text();
+  }
+  return await new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result || '');
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsText(file);
+  });
+}
+
 /**
- * High-level parser abstraction:
- * Parses a chat File (WhatsApp .txt or Telegram .json) and normalizes output into ChatMessage[]
- *
- * @param {File|Blob} file
+ * Parses multiple chat files (e.g. paginated Instagram message_1.json, message_2.json)
+ * @param {File[]|FileList} files
  * @param {Record<string, 'Her' | 'Him' | string>} [nicknameMap={}]
- * @returns {Promise<{ platform: 'whatsapp' | 'telegram', messages: ChatMessage[], senders: string[], rawSenders: string[] }>}
+ * @returns {Promise<{ platform: 'whatsapp' | 'telegram' | 'instagram', messages: ChatMessage[], senders: string[], rawSenders: string[] }>}
  */
-export async function parseChatFile(file, nicknameMap = {}) {
-  if (!file) {
+export async function parseChatFiles(files, nicknameMap = {}) {
+  const fileArray = Array.from(files || []).filter(Boolean);
+  if (fileArray.length === 0) {
+    throw new Error('No files provided.');
+  }
+
+  if (fileArray.length === 1) {
+    return parseChatFile(fileArray[0], nicknameMap);
+  }
+
+  // Multiple files: read all and parse
+  const contents = await Promise.all(
+    fileArray.map(async (file) => {
+      const text = await readFileText(file);
+      const detection = detectPlatform(text, file.name);
+      return { file, text, detection };
+    })
+  );
+
+  const instagramPayloads = [];
+  const telegramItems = [];
+  const whatsappItems = [];
+
+  for (const item of contents) {
+    if (item.detection && item.detection.platform === 'instagram') {
+      instagramPayloads.push(item.detection.data || JSON.parse(item.text));
+    } else if (item.detection && item.detection.platform === 'telegram') {
+      telegramItems.push(item);
+    } else if (item.detection && item.detection.platform === 'whatsapp') {
+      whatsappItems.push(item);
+    }
+  }
+
+  const detectedPlatformNames = [
+    instagramPayloads.length > 0 ? 'instagram' : null,
+    telegramItems.length > 0 ? 'telegram' : null,
+    whatsappItems.length > 0 ? 'whatsapp' : null,
+  ].filter(Boolean);
+
+  // If only Instagram files are present
+  if (detectedPlatformNames.length === 1 && detectedPlatformNames[0] === 'instagram') {
+    return parseInstagramJson(instagramPayloads, nicknameMap);
+  }
+
+  // If only Telegram files
+  if (detectedPlatformNames.length === 1 && detectedPlatformNames[0] === 'telegram') {
+    return parseTelegramJson(telegramItems[0].detection?.data || telegramItems[0].text, nicknameMap);
+  }
+
+  // If only WhatsApp files
+  if (detectedPlatformNames.length === 1 && detectedPlatformNames[0] === 'whatsapp') {
+    return parseWhatsApp(whatsappItems[0].text, nicknameMap);
+  }
+
+  // If mixed platforms were dropped together
+  if (detectedPlatformNames.length > 1) {
+    const platforms = [];
+    if (whatsappItems.length > 0) {
+      platforms.push(parseWhatsApp(whatsappItems[0].text, nicknameMap));
+    }
+    if (telegramItems.length > 0) {
+      platforms.push(parseTelegramJson(telegramItems[0].detection?.data || telegramItems[0].text, nicknameMap));
+    }
+    if (instagramPayloads.length > 0) {
+      platforms.push(parseInstagramJson(instagramPayloads, nicknameMap));
+    }
+    return {
+      multiPlatform: true,
+      platforms,
+    };
+  }
+
+  // If unrecognized, fallback to first file
+  return parseChatFile(fileArray[0], nicknameMap);
+}
+
+/**
+ *
+ * @param {File|Blob|File[]|FileList} fileOrFiles
+ * @param {Record<string, 'Her' | 'Him' | string>} [nicknameMap={}]
+ * @returns {Promise<{ platform: 'whatsapp' | 'telegram' | 'instagram', messages: ChatMessage[], senders: string[], rawSenders: string[] }>}
+ */
+export async function parseChatFile(fileOrFiles, nicknameMap = {}) {
+  if (!fileOrFiles) {
     throw new Error('No file provided.');
   }
 
-  let text;
-  if (typeof file.text === 'function') {
-    text = await file.text();
-  } else {
-    text = await new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (e) => resolve(e.target?.result || '');
-      reader.onerror = () => reject(new Error('Failed to read file'));
-      reader.readAsText(file);
-    });
+  if (Array.isArray(fileOrFiles) || (typeof FileList !== 'undefined' && fileOrFiles instanceof FileList)) {
+    const list = Array.from(fileOrFiles);
+    if (list.length > 1) {
+      return parseChatFiles(list, nicknameMap);
+    }
+    fileOrFiles = list[0];
   }
+
+  const file = fileOrFiles;
+  const text = await readFileText(file);
 
   if (typeof text !== 'string' || !text.trim()) {
     throw new Error('The selected file is empty.');
@@ -389,7 +766,13 @@ export async function parseChatFile(file, nicknameMap = {}) {
   const detection = detectPlatform(text, file.name || '');
 
   if (!detection || !detection.platform) {
-    throw new Error('Unrecognized format. Please provide a valid WhatsApp .txt export or Telegram .json export.');
+    throw new Error(
+      'Unrecognized format. Please provide a valid WhatsApp .txt export, Telegram .json export, or Instagram .json export.'
+    );
+  }
+
+  if (detection.platform === 'instagram') {
+    return parseInstagramJson(detection.data || text, nicknameMap);
   }
 
   if (detection.platform === 'telegram') {
@@ -400,7 +783,9 @@ export async function parseChatFile(file, nicknameMap = {}) {
     return parseWhatsApp(text, nicknameMap);
   }
 
-  throw new Error('Unrecognized format. Please provide a valid WhatsApp .txt export or Telegram .json export.');
+  throw new Error(
+    'Unrecognized format. Please provide a valid WhatsApp .txt export, Telegram .json export, or Instagram .json export.'
+  );
 }
 
 /**

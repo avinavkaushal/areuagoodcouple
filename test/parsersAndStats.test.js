@@ -224,6 +224,22 @@ multiline content here
     const msg4 = result.messages[3];
     assert.equal(msg4.type, 'sticker');
   });
+
+  test('parses iOS bracket-format WhatsApp export with seconds and AM/PM', () => {
+    const iosText = `[21/10/24, 4:13:30 PM] Her: hello from iOS!
+Second line of message
+[21/10/24, 4:15:00 PM] Him: hey there!`;
+
+    const result = parseWhatsApp(iosText);
+    assert.equal(result.messages.length, 2);
+    assert.equal(result.messages[0].sender, 'Her');
+    assert.ok(result.messages[0].text.includes('Second line of message'));
+    assert.equal(result.messages[0].timestamp.getHours(), 16); // 4 PM = 16
+    assert.equal(result.messages[0].timestamp.getMinutes(), 13);
+    assert.equal(result.messages[0].timestamp.getSeconds(), 30);
+    assert.equal(result.messages[1].sender, 'Him');
+    assert.equal(result.messages[1].timestamp.getHours(), 16);
+  });
 });
 
 describe('Platform Detection and parseChatFile abstraction', () => {
@@ -235,8 +251,10 @@ describe('Platform Detection and parseChatFile abstraction', () => {
   });
 
   test('detects WhatsApp export from date pattern', () => {
-    const wa = '21/10/24, 16:13 - Her: hello';
-    assert.equal(detectPlatform(wa).platform, 'whatsapp');
+    const waDash = '21/10/24, 16:13 - Her: hello';
+    assert.equal(detectPlatform(waDash).platform, 'whatsapp');
+    const waBracket = '[21/10/24, 16:13:00] Her: hello';
+    assert.equal(detectPlatform(waBracket).platform, 'whatsapp');
   });
 
   test('returns null for unrecognized format', () => {

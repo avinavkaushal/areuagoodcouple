@@ -14,8 +14,7 @@
  * @property {Array<{ emoji: string, sender?: string }>} [meta.reactions]
  */
 
-const DASH_LINE_RE = /^(\d{1,2})[/-](\d{1,2})[/-](\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([apAP]\.?\s*[mM]\.?))?\s+-\s+([^:]+?):\s+(.*)$/;
-const BRACKET_LINE_RE = /^\[(\d{1,2})[/-](\d{1,2})[/-](\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([apAP]\.?\s*[mM]\.?))?\]\s+([^:]+?):\s+(.*)$/;
+const WA_LINE_RE = /^\[?(\d{1,2})[/-](\d{1,2})[/-](\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([apAP]\.?\s*[mM]\.?))?(?:\]|\s+-)\s+([^:]+?):\s+(.*)$/;
 
 function parseDateTime(d, m, y, h, min, sec, ampm) {
   let year = +y;
@@ -262,10 +261,9 @@ export function parseWhatsApp(text, nicknameMap = {}) {
   for (const rawLine of lines) {
     // Strip invisible unicode directional formatting characters
     const line = rawLine.replace(/[\u200E\u200F\u202A-\u202E]/g, '');
-    let match = line.match(DASH_LINE_RE);
-    if (!match) {
-      match = line.match(BRACKET_LINE_RE);
-    }
+    const code = line.charCodeAt(0);
+    // Fast-path: header must start with '[' (ASCII 91) or digit '0'-'9' (ASCII 48-57)
+    const match = (code === 91 || (code >= 48 && code <= 57)) ? line.match(WA_LINE_RE) : null;
 
     if (match) {
       const [, day, month, year, hour, min, sec, ampm, senderRaw, msg] = match;
@@ -635,7 +633,8 @@ export function detectPlatform(text, fileName = '') {
   const lines = trimmed.split(/\r?\n/).slice(0, 100);
   for (const rawLine of lines) {
     const line = rawLine.replace(/[\u200E\u200F\u202A-\u202E]/g, '');
-    if (DASH_LINE_RE.test(line) || BRACKET_LINE_RE.test(line)) {
+    const code = line.charCodeAt(0);
+    if ((code === 91 || (code >= 48 && code <= 57)) && WA_LINE_RE.test(line)) {
       return { platform: 'whatsapp' };
     }
   }

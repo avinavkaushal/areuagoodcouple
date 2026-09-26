@@ -35,7 +35,7 @@ export function getNonSystemMessages(messages) {
 }
 
 function getMsgDate(m) {
-  return m ? (m.timestamp instanceof Date ? m.timestamp : (m.date instanceof Date ? m.date : new Date(m.timestamp || m.date || 0))) : new Date();
+  return m ? m.timestamp : new Date();
 }
 
 export function getEmojiStats(messages) {

@@ -112,7 +112,7 @@ function CrossPlatformStats({ messages, loadedPlatforms = {}, onAddPlatform }) {
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
               </svg>
-              <span>+ Link Another Platform</span>
+              <span>Link Another Platform</span>
             </button>
           )}
         </div>
@@ -468,7 +468,7 @@ function CrossPlatformStats({ messages, loadedPlatforms = {}, onAddPlatform }) {
                 onClick={onAddPlatform}
                 className="px-6 py-2.5 rounded-full bg-pink text-night font-sans font-bold text-xs uppercase tracking-wider hover:bg-blush transition-all shadow-lg hover:shadow-pink/20 cursor-pointer"
               >
-                + Link Another Platform Now
+                Link Another Platform Now
               </button>
             )}
           </div>

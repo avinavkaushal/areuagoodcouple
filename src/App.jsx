@@ -1,4 +1,6 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useEffect } from 'react';
+import bgWebm from './assets/output.webm';
+import bgMp4 from './assets/output.mp4';
 import { parseChatFile, parseChatFiles, applyNicknameMapping } from './lib/parseChat';
 import {
   getStoredNicknameConfig,
@@ -43,6 +45,32 @@ function App() {
 
   const fileInputRef = useRef(null);
   const addPlatformInputRef = useRef(null);
+  const uploadVideoRef = useRef(null);
+
+  useEffect(() => {
+    if (messages) return;
+    const video = uploadVideoRef.current;
+    if (!video) return;
+
+    video.muted = true;
+    video.defaultMuted = true;
+
+    const playVideo = () => {
+      const promise = video.play();
+      if (promise !== undefined) {
+        promise.catch(() => {});
+      }
+    };
+
+    playVideo();
+    video.addEventListener('loadeddata', playVideo);
+    video.addEventListener('canplay', playVideo);
+
+    return () => {
+      video.removeEventListener('loadeddata', playVideo);
+      video.removeEventListener('canplay', playVideo);
+    };
+  }, [messages]);
 
   // Unified chronological message list merging all loaded platforms
   const unifiedMessages = useMemo(() => {
@@ -506,8 +534,24 @@ function App() {
 
   if (!messages) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-night text-cloud px-6 py-12 select-none">
-        <div className="w-full max-w-lg flex flex-col items-center">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-night text-cloud px-6 py-12 select-none relative overflow-hidden">
+        {/* Looping background video */}
+        <video
+          ref={uploadVideoRef}
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none motion-reduce:hidden"
+        >
+          <source src={bgWebm} type="video/webm" />
+          <source src={bgMp4} type="video/mp4" />
+        </video>
+
+        {/* Dark gradient overlay between video and card content for legibility */}
+        <div className="fixed inset-0 bg-gradient-to-b from-night/80 via-night/60 to-night/90 pointer-events-none z-0" />
+
+        <div className="w-full max-w-lg flex flex-col items-center relative z-10">
           {/* Main Drop / Upload / Confirmation Card */}
           <div
             onClick={() => !pendingChat && !isParsing && fileInputRef.current?.click()}

@@ -64,6 +64,12 @@ function App() {
     return merged;
   }, [loadedPlatforms, messages]);
 
+  // Pre-filter valid non-system messages once for all downstream feature stats
+  const validMessages = useMemo(
+    () => (unifiedMessages || []).filter((m) => m && m.type !== 'system'),
+    [unifiedMessages]
+  );
+
   async function validateAndProcessFiles(fileList) {
     setErrorMessage(null);
     setPendingChat(null);
@@ -890,7 +896,7 @@ function App() {
 
   return (
     <div className="bg-night text-cloud relative">
-      <QuickNav messages={unifiedMessages} onOpenSettings={() => setIsSettingsOpen(true)} />
+      <QuickNav messages={validMessages} onOpenSettings={() => setIsSettingsOpen(true)} />
 
       {/* Settings Modal */}
       <SettingsModal
@@ -1020,36 +1026,36 @@ function App() {
       )}
 
       <Hero
-        messages={unifiedMessages}
+        messages={validMessages}
         senders={senders}
         herName={currentHerSender}
         himName={currentHimSender}
         rawSenders={rawSenders}
       />
       <CrossPlatformStats
-        messages={unifiedMessages}
+        messages={validMessages}
         loadedPlatforms={loadedPlatforms}
         onAddPlatform={() => addPlatformInputRef.current?.click()}
       />
-      <Milestones messages={unifiedMessages} senders={senders} />
-      <CalendarHeat messages={unifiedMessages} senders={senders} />
-      <Highlights messages={unifiedMessages} senders={senders} />
-      <ReelStats messages={unifiedMessages} senders={senders} />
-      <MediaBreakdown messages={unifiedMessages} senders={senders} />
-      <ActivityHeatmap messages={unifiedMessages} senders={senders} />
-      <Initiator messages={unifiedMessages} senders={senders} />
-      <ResponseTime messages={unifiedMessages} senders={senders} />
-      <LoveWords messages={unifiedMessages} senders={senders} />
-      <KeywordSearch messages={unifiedMessages} senders={senders} />
-      <EmojiStats messages={unifiedMessages} senders={senders} />
-      <ReactionStats messages={unifiedMessages} senders={senders} />
+      <Milestones messages={validMessages} senders={senders} />
+      <CalendarHeat messages={validMessages} senders={senders} />
+      <Highlights messages={validMessages} senders={senders} />
+      <ReelStats messages={validMessages} senders={senders} />
+      <MediaBreakdown messages={validMessages} senders={senders} />
+      <ActivityHeatmap messages={validMessages} senders={senders} />
+      <Initiator messages={validMessages} senders={senders} />
+      <ResponseTime messages={validMessages} senders={senders} />
+      <LoveWords messages={validMessages} senders={senders} />
+      <KeywordSearch messages={validMessages} senders={senders} />
+      <EmojiStats messages={validMessages} senders={senders} />
+      <ReactionStats messages={validMessages} senders={senders} />
       <div id="word-cloud">
-        <WordCloud messages={unifiedMessages} senders={senders} />
+        <WordCloud messages={validMessages} senders={senders} />
       </div>
-      <RandomMemory messages={unifiedMessages} senders={senders} />
-      <CalloutStreak messages={unifiedMessages} senders={senders} />
-      <LongestMessage messages={unifiedMessages} senders={senders} />
-      <Outro messages={unifiedMessages} senders={senders} />
+      <RandomMemory messages={validMessages} senders={senders} />
+      <CalloutStreak messages={validMessages} senders={senders} />
+      <LongestMessage messages={validMessages} senders={senders} />
+      <Outro messages={validMessages} senders={senders} />
     </div>
   );
 }

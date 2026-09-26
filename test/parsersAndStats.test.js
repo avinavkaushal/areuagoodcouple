@@ -14,6 +14,7 @@ import {
 } from '../src/lib/parseChat.js';
 import { resolveSenderMapping } from '../src/lib/nicknameConfig.js';
 import {
+  getNonSystemMessages,
   getOverviewStats,
   getEmojiStats,
   getEmojiComparison,
@@ -349,112 +350,118 @@ describe('Downstream Feature Stats with Normalized ChatMessage', () => {
   ];
 
   const senders = ['Her', 'Him'];
+  const validMessages = getNonSystemMessages(mixedMessages);
+
+  test('getNonSystemMessages filters out system messages', () => {
+    assert.equal(validMessages.length, 5); // 6 total - 1 system = 5
+    assert.ok(validMessages.every((m) => m.type !== 'system'));
+  });
 
   test('getOverviewStats ignores system messages and counts media & words', () => {
-    const overview = getOverviewStats(mixedMessages);
-    assert.equal(overview.totalMessages, 5); // 6 total - 1 system = 5
+    const overview = getOverviewStats(validMessages);
+    assert.equal(overview.totalMessages, 5);
     assert.equal(overview.totalMedia, 2); // 1 media + 1 sticker
     assert.equal(overview.uniqueDays, 1);
   });
 
   test('getEmojiStats extracts emojis per person', () => {
-    const emojis = getEmojiStats(mixedMessages);
+    const emojis = getEmojiStats(validMessages);
     assert.ok(emojis.Her.some(([e]) => e === '❤️'));
     assert.ok(emojis.Him.some(([e]) => e === '😘'));
   });
 
   test('getEmojiComparison compares emoji usage', () => {
-    const cmp = getEmojiComparison(mixedMessages, senders);
+    const cmp = getEmojiComparison(validMessages, senders);
     assert.deepEqual(cmp.order, senders);
     assert.ok(cmp.rows.length > 0);
   });
 
   test('getKeywordStats searches text and computes hourly distribution', () => {
-    const kw = getKeywordStats(mixedMessages, 'morning');
+    const kw = getKeywordStats(validMessages, 'morning');
     assert.equal(kw.count, 2);
     assert.equal(kw.topHour, 9);
   });
 
   test('getHeatmapData creates 7x24 grid', () => {
-    const grid = getHeatmapData(mixedMessages);
+    const grid = getHeatmapData(validMessages);
     assert.equal(grid.length, 7);
     assert.equal(grid[0].length, 24);
   });
 
   test('getLongestStreak calculates streak correctly', () => {
-    const streak = getLongestStreak(mixedMessages);
+    const streak = getLongestStreak(validMessages);
     assert.equal(streak, 1);
   });
 
   test('getHighlights returns busiest day and streak', () => {
-    const hl = getHighlights(mixedMessages);
+    const hl = getHighlights(validMessages);
     assert.equal(hl.longestStreak, 1);
     assert.ok(hl.busiestDay);
   });
 
   test('getWordCloudData excludes stopwords and includes words', () => {
-    const wc = getWordCloudData(mixedMessages);
+    const wc = getWordCloudData(validMessages);
     assert.ok(Array.isArray(wc));
   });
 
   test('getMediaStats counts media and stickers per person', () => {
-    const media = getMediaStats(mixedMessages, senders);
+    const media = getMediaStats(validMessages, senders);
     assert.equal(media.Her, 1);
     assert.equal(media.Him, 1);
     assert.equal(media.total, 2);
   });
 
   test('getInitiatorStats correctly identifies first talker of the day', () => {
-    const init = getInitiatorStats(mixedMessages, senders);
+    const init = getInitiatorStats(validMessages, senders);
     assert.equal(init.p1.name, 'Her');
     assert.equal(init.p1.count, 1);
     assert.equal(init.p2.count, 0);
   });
 
   test('getLongestMessage finds longest text message', () => {
-    const longest = getLongestMessage(mixedMessages, senders);
+    const longest = getLongestMessage(validMessages, senders);
     assert.equal(longest.sender, 'Her');
     assert.ok(longest.wordCount >= 7);
   });
 
   test('getLateNightStats checks late night messages', () => {
-    const late = getLateNightStats(mixedMessages, senders);
+    const late = getLateNightStats(validMessages, senders);
     assert.ok(late.p1);
     assert.ok(late.p2);
   });
 
   test('getVerbosityStats calculates average words per message', () => {
-    const verb = getVerbosityStats(mixedMessages, senders);
+    const verb = getVerbosityStats(validMessages, senders);
     assert.ok(verb.p1.avg > 0);
     assert.ok(verb.p2.avg > 0);
   });
 
   test('getResponseTimeStats calculates reply times', () => {
-    const resp = getResponseTimeStats(mixedMessages, senders);
+    const resp = getResponseTimeStats(validMessages, senders);
     assert.ok(resp.order);
     assert.equal(resp.Her.name, 'Her');
     assert.equal(resp.Him.name, 'Him');
   });
 
   test('getMilestoneStats calculates total words, messages, and daily average', () => {
-    const miles = getMilestoneStats(mixedMessages, senders);
+    const miles = getMilestoneStats(validMessages, senders);
     assert.equal(miles.totalMessages, 5);
   });
 
   test('getLoveWordStats tracks terms of endearment', () => {
-    const love = getLoveWordStats(mixedMessages, senders);
+    const love = getLoveWordStats(validMessages, senders);
     assert.ok(love.totals.overall >= 3);
   });
 
   test('getRandomMemory returns a valid chat memory', () => {
-    const mem = getRandomMemory(mixedMessages);
+    const mem = getRandomMemory(validMessages);
     assert.ok(mem);
     assert.ok(mem.messages.length >= 1);
     assert.notEqual(mem.messages[0].type, 'system');
   });
 
   test('getCalloutStats calculates morning and night callouts', () => {
-    const callouts = getCalloutStats(mixedMessages, senders);
+    const callouts = getCalloutStats(validMessages, senders);
     assert.equal(callouts.morning.counts.Her, 1);
     assert.equal(callouts.morning.counts.Him, 1);
     assert.equal(callouts.night.counts.Him, 1);

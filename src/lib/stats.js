@@ -30,7 +30,7 @@ export function formatSinceDate(firstDate) {
   return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-function getNonSystemMessages(messages) {
+export function getNonSystemMessages(messages) {
   return (messages || []).filter((m) => m && m.type !== 'system');
 }
 
@@ -40,7 +40,7 @@ function getMsgDate(m) {
 
 export function getEmojiStats(messages) {
   const counts = {}; // { sender: { emoji: count } }
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   for (const m of validMessages) {
     const emojis = (m.text || '').match(EMOJI_RE) || [];
@@ -62,7 +62,7 @@ export function getEmojiComparison(messages, senders) {
   const order = [p1, p2];
   const bySender = { [p1]: {}, [p2]: {} };
   const total = {};
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   for (const m of validMessages) {
     const emojis = (m.text || '').match(EMOJI_RE) || [];
@@ -91,7 +91,7 @@ export function getEmojiComparison(messages, senders) {
 
 export function getKeywordStats(messages, keyword) {
   const kw = (keyword || '').trim().toLowerCase();
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   if (!kw || validMessages.length === 0) return null;
 
   const hourCounts = new Array(24).fill(0);
@@ -147,7 +147,7 @@ export function getKeywordStats(messages, keyword) {
 export function getHeatmapData(messages) {
   // grid[day][hour] = count, day 0=Sun..6=Sat
   const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   validMessages.forEach((m) => {
     const d = getMsgDate(m);
@@ -160,7 +160,7 @@ const MONTH_NAMES = ['January','February','March','April','May','June','July','A
 
 // Reusable streak helper: longest run of consecutive calendar days where matchFn(m) is true
 export function getLongestStreak(messages, matchFn) {
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   if (validMessages.length === 0) return 0;
   const dayTimestamps = new Set();
 
@@ -193,7 +193,7 @@ export function getLongestStreak(messages, matchFn) {
 }
 
 export function getHighlights(messages) {
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   if (validMessages.length === 0) {
     return {
       busiestDay: null,
@@ -253,7 +253,7 @@ const STOPWORDS = new Set([
 
 export function getWordCloudData(messages, topN = 40) {
   const counts = {};
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   validMessages.forEach((m) => {
     const words = (m.text || '').toLowerCase().match(/[a-z\p{sc=Devanagari}]+/gu) || [];
@@ -282,7 +282,7 @@ export function getMediaStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   let count1 = 0;
   let count2 = 0;
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   validMessages.forEach((m) => {
     if (isMediaMessage(m)) {
@@ -295,7 +295,7 @@ export function getMediaStats(messages, senders) {
 }
 
 export function getOverviewStats(messages) {
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   if (validMessages.length === 0) {
     return { totalMessages: 0, totalWords: 0, uniqueDays: 0, totalMedia: 0, firstDate: null, lastDate: null };
   }
@@ -322,7 +322,7 @@ export function getPeakSlot(grid) {
 }
 
 export function getCalendarHeat(messages) {
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   if (validMessages.length === 0) return [];
   const firstDate = getMsgDate(validMessages[0]);
   const lastDate = getMsgDate(validMessages[validMessages.length - 1]);
@@ -353,7 +353,7 @@ export function getCalendarHeat(messages) {
 export function getInitiatorStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const firstMsgByDay = {}; // { YYYY-MM-DD: sender }
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   validMessages.forEach((m) => {
     const d = getMsgDate(m);
@@ -382,7 +382,7 @@ export function getInitiatorStats(messages, senders) {
 
 export function getLongestMessage(messages, senders) {
   const defaultSender = senders && senders[0] ? senders[0] : 'unknown';
-  const validMessages = getNonSystemMessages(messages).filter((m) => !isMediaMessage(m));
+  const validMessages = (messages || []).filter((m) => !isMediaMessage(m));
   if (validMessages.length === 0) {
     return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
@@ -419,7 +419,7 @@ export function getLateNightStats(messages, senders) {
   let count2Total = 0;
   let count1Late = 0;
   let count2Late = 0;
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   validMessages.forEach((m) => {
     const d = getMsgDate(m);
@@ -449,7 +449,7 @@ export function getVerbosityStats(messages, senders) {
   let msgs1 = 0;
   let words2 = 0;
   let msgs2 = 0;
-  const validMessages = getNonSystemMessages(messages).filter((m) => !isMediaMessage(m));
+  const validMessages = (messages || []).filter((m) => !isMediaMessage(m));
 
   validMessages.forEach((m) => {
     const words = (m.text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -499,7 +499,7 @@ export function getResponseTimeStats(messages, senders) {
   };
 
   const MAX_REPLY_GAP = 12 * 60 * 60 * 1000; // 12 hours
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   if (validMessages.length > 1) {
     for (let i = 1; i < validMessages.length; i++) {
@@ -554,7 +554,7 @@ export function getResponseTimeStats(messages, senders) {
 // 2. Milestone Counter
 export function getMilestoneStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   const totalMessages = validMessages.length;
   let totalWords = 0;
   const msgsBySender = { [p1]: 0, [p2]: 0 };
@@ -618,7 +618,7 @@ export function getLoveWordStats(messages, senders) {
 
   const totals = { [p1]: 0, [p2]: 0, overall: 0 };
   const monthlyCounts = {};
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   for (let i = 0; i < validMessages.length; i++) {
     const m = validMessages[i];
@@ -696,7 +696,7 @@ export function getLoveWordStats(messages, senders) {
 
 // 4. Random Memory Picker
 export function getRandomMemory(messages) {
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   if (validMessages.length === 0) return null;
 
   const candidates = [];
@@ -763,7 +763,7 @@ export function getCalloutStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
   const morningCounts = { [p1]: 0, [p2]: 0, total: 0 };
   const nightCounts = { [p1]: 0, [p2]: 0, total: 0 };
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   for (let i = 0; i < validMessages.length; i++) {
     const m = validMessages[i];
@@ -813,7 +813,7 @@ export function getCalloutStats(messages, senders) {
  */
 export function getReelStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
   const reelMessages = validMessages.filter((m) => m.type === 'reel_share');
 
   // 1. Reel count per person
@@ -951,7 +951,7 @@ export function getReelStats(messages, senders) {
  */
 export function getMediaBreakdownStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   const initPerson = (name) => ({
     name,
@@ -1029,7 +1029,7 @@ export function getMediaBreakdownStats(messages, senders) {
  */
 export function getReactionStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   let reactionsSent1 = 0;
   let reactionsSent2 = 0;
@@ -1226,7 +1226,7 @@ export function getReactionStats(messages, senders) {
  * @returns {Object}
  */
 export function getCrossPlatformStats(messages, loadedPlatforms = {}) {
-  const validMessages = getNonSystemMessages(messages);
+  const validMessages = messages || [];
 
   const platformCounts = {
     whatsapp: 0,

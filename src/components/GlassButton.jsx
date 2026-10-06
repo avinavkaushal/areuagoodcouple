@@ -1,60 +1,67 @@
-import { useEffect, useRef } from 'react';
+import { useRef } from 'react';
 
-function GlassButton({ text, onClick, className = '' }) {
-  const buttonRef = useRef(null);
+const MAX_PULL = 8; // px the button drifts toward the pointer
 
-  useEffect(() => {
-    const btnEl = buttonRef.current;
-    if (!btnEl) return;
+/**
+ * Primary liquid-glass call-to-action.
+ * - Magnetic: drifts toward the pointer and springs back on leave.
+ * - Specular highlight tracks the pointer (--bx / --by).
+ * - Springy press via CSS (:active scale).
+ */
+function GlassButton({ text, onClick, className = '', icon = 'upload', disabled = false, type = 'button' }) {
+  const ref = useRef(null);
 
-    // If liquid-glass is available, initialize container/canvas overlay
-    if (window.Container && !btnEl.querySelector('canvas')) {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.style.position = 'absolute';
-        canvas.style.top = '0';
-        canvas.style.left = '0';
-        canvas.style.width = '100%';
-        canvas.style.height = '100%';
-        canvas.style.borderRadius = '9999px';
-        canvas.style.pointerEvents = 'none';
-        canvas.style.mixBlendMode = 'overlay';
-        canvas.style.zIndex = '1';
-        btnEl.appendChild(canvas);
-      } catch (e) {
-        console.warn('Liquid glass canvas init skipped:', e);
-      }
-    }
-  }, []);
+  const handleMove = (e) => {
+    if (e.pointerType === 'touch') return;
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width;
+    const py = (e.clientY - r.top) / r.height;
+    el.style.setProperty('--tx', `${(px - 0.5) * 2 * MAX_PULL}px`);
+    el.style.setProperty('--ty', `${(py - 0.5) * 2 * (MAX_PULL * 0.6)}px`);
+  };
+
+  const handleLeave = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.setProperty('--tx', '0px');
+    el.style.setProperty('--ty', '0px');
+  };
 
   return (
     <button
-      ref={buttonRef}
-      type="button"
+      ref={ref}
+      type={type}
       onClick={onClick}
-      className={`relative inline-flex items-center justify-center gap-3 px-8 py-4 rounded-full bg-navy hover:bg-[#032677] text-white font-sans font-bold text-base tracking-wide shadow-xl hover:shadow-2xl hover:scale-105 active:scale-95 transition-all duration-200 cursor-pointer overflow-hidden border border-white/20 group ${className}`}
+      disabled={disabled}
+      onPointerMove={handleMove}
+      onPointerLeave={handleLeave}
+      className={`lg-button group ${className}`}
     >
-      {/* Subtle glass reflection overlay */}
-      <span
-        aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-b from-white/25 via-transparent to-black/15 pointer-events-none rounded-full"
-      />
-      {/* Upload icon */}
-      <svg
-        className="w-5 h-5 text-pink group-hover:scale-110 transition-transform relative z-10 shrink-0"
-        fill="none"
-        viewBox="0 0 24 24"
-        stroke="currentColor"
-      >
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          strokeWidth="2"
-          d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
-        />
-      </svg>
-      {/* Button text */}
-      <span className="relative z-10 select-none">{text}</span>
+      {icon === 'upload' && (
+        <svg
+          className="w-5 h-5 shrink-0 text-blush transition-transform duration-500 group-hover:-translate-y-0.5"
+          style={{ color: '#FFCEE3' }}
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          aria-hidden="true"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+          />
+        </svg>
+      )}
+      {icon === 'sparkle' && (
+        <svg className="w-5 h-5 shrink-0" style={{ color: '#FFCEE3' }} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 2l1.9 5.6L19.5 9.5l-5.6 1.9L12 17l-1.9-5.6L4.5 9.5l5.6-1.9L12 2zm7 11l.9 2.6 2.6.9-2.6.9L19 20l-.9-2.6-2.6-.9 2.6-.9L19 13z" />
+        </svg>
+      )}
+      <span className="relative select-none whitespace-nowrap">{text}</span>
     </button>
   );
 }

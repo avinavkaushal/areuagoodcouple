@@ -5,10 +5,23 @@ import heroWebm from '../assets/hero-bg.webm';
 import heroMp4 from '../assets/hero-bg.mp4';
 import heroPoster from '../assets/hero-bg-poster.jpg';
 
-function Hero({ messages, senders, herName, himName, rawSenders }) {
+function splitName(name) {
+  const trimmed = String(name || '').trim();
+  const spaceIndex = trimmed.indexOf(' ');
+  if (spaceIndex === -1) {
+    return { first: trimmed, rest: '' };
+  }
+  return {
+    first: trimmed.slice(0, spaceIndex),
+    rest: trimmed.slice(spaceIndex), // includes the leading space
+  };
+}
+
+function Hero({ messages, senders, herName, himName, rawSenders, theme }) {
   const lettersRef = useRef(null);
   const subRef = useRef(null);
   const videoRef = useRef(null);
+  const isLight = theme ? theme.resolved === 'light' : false;
 
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -18,8 +31,10 @@ function Hero({ messages, senders, herName, himName, rawSenders }) {
   });
 
   // Resolve input names: him on left, her on right (or input names in order)
-  const name1 = himName || rawSenders?.[0] || (senders && senders[1]) || 'Him';
-  const name2 = herName || rawSenders?.[1] || (senders && senders[0]) || 'Her';
+  const name1 = String(himName || rawSenders?.[0] || (senders && senders[1]) || 'Him');
+  const name2 = String(herName || rawSenders?.[1] || (senders && senders[0]) || 'Her');
+  const name1Parts = splitName(name1);
+  const name2Parts = splitName(name2);
 
   const firstDate = messages?.[0]?.timestamp || messages?.[0]?.date;
   const lastDate = messages?.[messages?.length - 1]?.timestamp || messages?.[messages?.length - 1]?.date;
@@ -81,23 +96,25 @@ function Hero({ messages, senders, herName, himName, rawSenders }) {
         opacity: 0,
         duration: 0.8,
         stagger: 0.035,
-      })
-        .from(subRef.current, { opacity: 0, y: 10, duration: 0.6 }, '-=0.3');
+      });
+      if (subRef.current) {
+        tl.from(subRef.current, { opacity: 0, y: 10, duration: 0.6 }, '-=0.3');
+      }
     });
 
     return () => ctx.revert();
   }, [name1, name2]);
 
   return (
-    <section className="relative overflow-hidden bg-black isolate py-24 sm:py-32 flex flex-col justify-center px-8 sm:px-16 min-h-[75vh] sm:min-h-[85vh]">
+    <section className="relative overflow-hidden isolate py-28 sm:py-36 flex flex-col justify-center px-6 sm:px-14 md:px-20 min-h-[78vh] sm:min-h-[88vh]">
       {/* Background Video / Static Poster for reduced motion */}
       {prefersReducedMotion ? (
         <img
           src={heroPoster}
           alt=""
           aria-hidden="true"
-          style={{ objectPosition: '82% center' }}
-          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none"
+          style={{ objectPosition: '82% center', opacity: isLight ? 0.35 : 0.85 }}
+          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none transition-opacity duration-500"
         />
       ) : (
         <video
@@ -108,51 +125,83 @@ function Hero({ messages, senders, herName, himName, rawSenders }) {
           playsInline
           poster={heroPoster}
           preload="auto"
-          style={{ objectPosition: '82% center' }}
-          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none"
+          style={{ objectPosition: '82% center', opacity: isLight ? 0.35 : 0.85 }}
+          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none transition-opacity duration-500"
         >
           <source src={heroMp4} type="video/mp4" />
           <source src={heroWebm} type="video/webm" />
         </video>
       )}
 
-      {/* Subtle black gradient scrim for text legibility */}
+      {/* Themed ink scrim for seamless transition into the canvas */}
       <div
         aria-hidden="true"
-        className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/35 to-transparent pointer-events-none z-[1]"
+        className={`absolute inset-0 pointer-events-none z-[1] transition-all duration-500 ${
+          isLight
+            ? 'bg-gradient-to-r from-night/95 via-night/85 to-night/45'
+            : 'bg-gradient-to-r from-night/95 via-night/65 to-transparent'
+        }`}
+      />
+      <div
+        aria-hidden="true"
+        className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-night to-transparent pointer-events-none z-[1]"
       />
 
       {/* Hero content */}
       <div className="max-w-4xl relative z-10">
         <h1
           ref={lettersRef}
-          className="font-serif font-semibold text-cloud leading-tight text-[11vw] sm:text-[6vw] md:text-[5vw] flex flex-wrap items-center gap-x-2 sm:gap-x-4 drop-shadow-md select-none"
+          className="font-serif font-semibold text-cloud leading-[1.08] text-[12vw] sm:text-[6.5vw] md:text-[5.2vw] flex flex-wrap items-center gap-x-2 sm:gap-x-4 select-none drop-shadow-sm"
         >
           <span className="inline-flex items-center flex-wrap">
-            {name1.split('').map((ch, i) => (
-              <span key={`p1-${i}`} className="hero-anim-item inline-block">
+            {name1Parts.first.split('').map((ch, i) => (
+              <span key={`p1-f-${i}`} className="hero-anim-item inline-block">
                 {ch === ' ' ? '\u00A0' : ch}
               </span>
             ))}
+            {name1Parts.rest && (
+              <span className="hidden sm:inline-flex items-center">
+                {name1Parts.rest.split('').map((ch, i) => (
+                  <span key={`p1-r-${i}`} className="hero-anim-item inline-block">
+                    {ch === ' ' ? '\u00A0' : ch}
+                  </span>
+                ))}
+              </span>
+            )}
           </span>
 
-          <span className="hero-anim-item inline-block text-pink mx-1.5 sm:mx-3 font-serif font-normal opacity-90 select-none">
+          <span className="hero-anim-item inline-block text-pink mx-1.5 sm:mx-3 font-serif font-normal select-none dark:drop-shadow-[0_0_20px_rgba(255,133,187,0.4)]">
             &amp;
           </span>
 
           <span className="inline-flex items-center flex-wrap">
-            {name2.split('').map((ch, i) => (
-              <span key={`p2-${i}`} className="hero-anim-item inline-block">
+            {name2Parts.first.split('').map((ch, i) => (
+              <span key={`p2-f-${i}`} className="hero-anim-item inline-block">
                 {ch === ' ' ? '\u00A0' : ch}
               </span>
             ))}
+            {name2Parts.rest && (
+              <span className="hidden sm:inline-flex items-center">
+                {name2Parts.rest.split('').map((ch, i) => (
+                  <span key={`p2-r-${i}`} className="hero-anim-item inline-block">
+                    {ch === ' ' ? '\u00A0' : ch}
+                  </span>
+                ))}
+              </span>
+            )}
           </span>
         </h1>
 
-        <div className="mt-6 sm:mt-8">
-          <p ref={subRef} className="font-sans text-cloud/85 text-sm sm:text-base tracking-tight font-medium drop-shadow-sm">
-            {duration}, one chat{sinceDate ? `, since ${sinceDate}` : ''}
-          </p>
+        <div className="mt-7 sm:mt-9">
+          <div
+            ref={subRef}
+            className="glass-chip glass-refract rounded-full px-4 sm:px-5 py-2 inline-flex items-center gap-2.5 text-xs sm:text-sm font-sans text-cloud/90 font-medium shadow-md"
+          >
+            <span className="w-2 h-2 rounded-full bg-pink animate-pulse shrink-0" aria-hidden="true" />
+            <span>
+              {duration}, one chat{sinceDate ? `, since ${sinceDate}` : ''}
+            </span>
+          </div>
         </div>
       </div>
     </section>

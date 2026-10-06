@@ -18,13 +18,13 @@ function Highlights({ messages, senders }) {
   const filterOptions = useMemo(() => {
     const opts = [{ id: 'all', label: 'All', count: platformCounts.all }];
     if (platformCounts.whatsapp > 0) {
-      opts.push({ id: 'whatsapp', label: 'WhatsApp', color: '#25D366', count: platformCounts.whatsapp });
+      opts.push({ id: 'whatsapp', label: 'WhatsApp', color: 'var(--color-wa-pink)', count: platformCounts.whatsapp });
     }
     if (platformCounts.instagram > 0) {
-      opts.push({ id: 'instagram', label: 'Instagram', color: '#8A2BE2', count: platformCounts.instagram });
+      opts.push({ id: 'instagram', label: 'Instagram', color: 'var(--color-ig-pink)', count: platformCounts.instagram });
     }
     if (platformCounts.telegram > 0) {
-      opts.push({ id: 'telegram', label: 'Telegram', color: '#2AABEE', count: platformCounts.telegram });
+      opts.push({ id: 'telegram', label: 'Telegram', color: 'var(--color-tg-pink)', count: platformCounts.telegram });
     }
     return opts;
   }, [platformCounts]);
@@ -40,27 +40,29 @@ function Highlights({ messages, senders }) {
 
   const accentColor =
     activeFilter === 'whatsapp'
-      ? 'text-[#25D366]'
+      ? 'text-wa-pink'
       : activeFilter === 'instagram'
-      ? 'text-[#8A2BE2]'
+      ? 'text-ig-pink'
       : activeFilter === 'telegram'
-      ? 'text-[#2AABEE]'
+      ? 'text-tg-pink'
       : 'text-pink';
 
   const rows = [
-    { label: 'busiest day', value: h.busiestDay?.count?.toLocaleString() || 0, detail: h.busiestDay?.label, size: 'text-5xl sm:text-6xl' },
-    { label: 'longest we talked, daily, in a row', value: `${h.longestStreak}`, detail: 'days in a row', size: 'text-5xl sm:text-6xl' },
-    { label: 'busiest month', value: h.busiestMonth?.count?.toLocaleString() || 0, detail: h.busiestMonth?.label, size: 'text-4xl sm:text-5xl' },
-    { label: 'longest we went quiet', value: h.longestGapDays, detail: 'days apart', size: 'text-4xl sm:text-5xl' },
-    { label: 'late-night messages (12am – 4am)', value: `${late.p1.pct}% · ${late.p2.pct}%`, detail: `${p1} · ${p2} (% of own messages)`, size: 'text-3xl sm:text-4xl' },
-    { label: 'average words per message', value: `${verb.p1.avg} · ${verb.p2.avg}`, detail: `${p1} · ${p2} (words/msg)`, size: 'text-3xl sm:text-4xl' },
+    { label: 'busiest day', value: h.busiestDay?.count?.toLocaleString() || '0', detail: h.busiestDay?.label, size: 'text-4xl sm:text-5xl' },
+    { label: 'longest streak', value: `${h.longestStreak} days`, detail: 'daily without missing a beat', size: 'text-4xl sm:text-5xl' },
+    { label: 'busiest month', value: h.busiestMonth?.count?.toLocaleString() || '0', detail: h.busiestMonth?.label, size: 'text-3xl sm:text-4xl' },
+    { label: 'longest we went quiet', value: `${h.longestGapDays} days`, detail: 'longest gap between messages', size: 'text-3xl sm:text-4xl' },
+    { label: 'late-night messages (12am – 4am)', value: `${late.p1.pct}% · ${late.p2.pct}%`, detail: `${p1} · ${p2} (% of own messages)`, size: 'text-2xl sm:text-3xl' },
+    { label: 'average words per message', value: `${verb.p1.avg} · ${verb.p2.avg}`, detail: `${p1} · ${p2} (words/msg)`, size: 'text-2xl sm:text-3xl' },
   ];
 
   return (
-    <section id="highlights" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-navy">
-      <div className="relative z-10">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sm:mb-12">
-          <p className="font-sans text-blush/70 text-sm">moments worth marking</p>
+    <section id="highlights" className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32">
+      <div className="relative z-10 max-w-4xl mx-auto w-full">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sm:mb-10 min-w-0">
+          <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold">
+            moments worth marking
+          </p>
 
           {/* Liquid Glass Switcher */}
           <LiquidGlassSwitcher
@@ -70,15 +72,19 @@ function Highlights({ messages, senders }) {
           />
         </div>
 
-        <div className="max-w-2xl space-y-4">
+        <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight font-semibold mb-8 sm:mb-10">
+          highs, streaks, &amp; quiet nights.
+        </h2>
+
+        <div className="space-y-4">
           {rows.map((r) => (
             <div
               key={r.label}
-              className="glass rounded-2xl p-6 flex items-baseline justify-between gap-6"
+              className="glass glass-lift rounded-3xl p-6 sm:p-7 flex flex-col sm:flex-row sm:items-baseline justify-between gap-3 sm:gap-6"
             >
-              <p className="font-sans text-cloud/80 text-sm sm:text-base max-w-[50%]">{r.label}</p>
-              <div className="text-right">
-                <span className={`font-serif font-semibold ${accentColor} ${r.size}`}>{r.value}</span>
+              <p className="font-sans text-cloud/80 text-sm sm:text-base font-medium capitalize">{r.label}</p>
+              <div className="sm:text-right">
+                <span className={`font-serif font-semibold tabular-nums ${accentColor} ${r.size}`}>{r.value}</span>
                 {r.detail && <p className="font-sans text-cloud/50 text-xs mt-1">{r.detail}</p>}
               </div>
             </div>

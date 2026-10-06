@@ -27,7 +27,7 @@ const HOUR_LABELS_12H = [
 
 function getIntensityClass(count, max) {
   if (count === 0) {
-    return 'bg-white/[0.03] border-white/[0.04] text-transparent hover:border-white/20';
+    return 'bg-empty-cell border-glass-divider text-transparent hover:border-pink/40';
   }
   const ratio = count / max;
   if (ratio < 0.25) {
@@ -37,9 +37,9 @@ function getIntensityClass(count, max) {
     return 'bg-pink/45 border-pink/55 hover:border-pink/80';
   }
   if (ratio < 0.8) {
-    return 'bg-pink/75 border-pink/90 hover:border-white shadow-[0_0_8px_rgba(255,133,187,0.3)]';
+    return 'bg-pink/75 border-pink/90 hover:border-white dark:shadow-[0_0_8px_rgba(255,133,187,0.3)] shadow-sm';
   }
-  return 'bg-[#C93F82] border-pink hover:border-white shadow-[0_0_12px_rgba(201,63,130,0.5)]';
+  return 'bg-[#C93F82] border-pink hover:border-white dark:shadow-[0_0_14px_rgba(201,63,130,0.55)] shadow-md';
 }
 
 function ActivityHeatmap({ messages }) {
@@ -103,29 +103,29 @@ function ActivityHeatmap({ messages }) {
   const [hovered, setHovered] = useState(null);
 
   return (
-    <section id="activity" className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-12 md:px-16 py-20 sm:py-28 bg-night">
+    <section id="activity" className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32">
       <div className="relative z-10 max-w-5xl w-full mx-auto">
-        <p className="font-sans text-pink/80 text-xs uppercase tracking-wider mb-2">
+        <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold mb-3">
           our loudest hour
         </p>
 
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8 sm:mb-10">
-          <h2 className="font-serif text-cloud text-3xl sm:text-5xl leading-snug max-w-2xl font-semibold">
+          <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight max-w-2xl font-semibold">
             {peak.dayName}s around {peak.hourLabel}, we talk the most.
           </h2>
 
-          {/* Simple View Toggle */}
-          <div className="inline-flex p-1 rounded-full bg-white/[0.06] border border-white/10 text-xs shrink-0 self-start sm:self-auto">
+          {/* Liquid Glass View Toggle */}
+          <div className="inline-flex p-1 rounded-full glass glass-strong text-xs shrink-0 self-start sm:self-auto shadow-md">
             <button
               type="button"
               onClick={() => {
                 setViewMode('period');
                 setHovered(null);
               }}
-              className={`px-3 py-1 rounded-full font-sans transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full font-sans transition-all cursor-pointer ${
                 viewMode === 'period'
-                  ? 'bg-pink text-navy font-semibold shadow-sm'
-                  : 'text-cloud/60 hover:text-cloud'
+                  ? 'bg-pink text-on-pink font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_-2px_color-mix(in_oklab,var(--color-pink)_65%,transparent)]'
+                  : 'text-cloud/65 hover:text-cloud'
               }`}
             >
               4 Periods
@@ -136,10 +136,10 @@ function ActivityHeatmap({ messages }) {
                 setViewMode('hourly');
                 setHovered(null);
               }}
-              className={`px-3 py-1 rounded-full font-sans transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-full font-sans transition-all cursor-pointer ${
                 viewMode === 'hourly'
-                  ? 'bg-pink text-navy font-semibold shadow-sm'
-                  : 'text-cloud/60 hover:text-cloud'
+                  ? 'bg-pink text-on-pink font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_4px_12px_-2px_color-mix(in_oklab,var(--color-pink)_65%,transparent)]'
+                  : 'text-cloud/65 hover:text-cloud'
               }`}
             >
               24 Hours
@@ -148,7 +148,7 @@ function ActivityHeatmap({ messages }) {
         </div>
 
         {/* Decluttered Glass Card Container */}
-        <div className="glass rounded-3xl p-5 sm:p-7 border border-white/10 shadow-xl select-none">
+        <div className={`glass rounded-3xl p-6 sm:p-8 select-none ${hovered ? 'chart-dim' : ''}`}>
           {viewMode === 'period' ? (
             /* ------------------ 4 PERIODS VIEW (Mobile-friendly, Zero Horizontal Scroll) ------------------ */
             <div className="w-full">
@@ -176,6 +176,8 @@ function ActivityHeatmap({ messages }) {
                       return (
                         <div
                           key={p}
+                          data-cell="true"
+                          data-active={isHovered ? 'true' : undefined}
                           onMouseEnter={() =>
                             setHovered({
                               type: 'period',
@@ -195,10 +197,10 @@ function ActivityHeatmap({ messages }) {
                               count,
                             })
                           }
-                          className={`relative h-10 sm:h-12 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-center ${getIntensityClass(
+                          className={`relative h-11 sm:h-12 rounded-xl border transition-all duration-150 cursor-pointer flex items-center justify-center ${getIntensityClass(
                             count,
                             maxPeriodCount
-                          )} ${isPeak ? 'ring-1.5 ring-pink shadow-[0_0_10px_rgba(255,133,187,0.4)]' : ''} ${
+                          )} ${isPeak ? 'ring-2 ring-pink dark:shadow-[0_0_12px_rgba(255,133,187,0.5)] shadow-sm' : ''} ${
                             isHovered ? 'scale-105 shadow-xl brightness-125 z-10' : ''
                           }`}
                         />
@@ -217,7 +219,7 @@ function ActivityHeatmap({ messages }) {
                   <div />
                   {HOUR_TICKS_CLEAN.map((tick, h) => (
                     <div key={h} className="flex justify-center items-center h-4">
-                      {tick ? tick : <span className="w-1 h-1 rounded-full bg-white/15" />}
+                      {tick ? tick : <span className="w-1 h-1 rounded-full bg-[var(--glass-divider)]" />}
                     </div>
                   ))}
                 </div>
@@ -235,6 +237,8 @@ function ActivityHeatmap({ messages }) {
                         return (
                           <div
                             key={h}
+                            data-cell="true"
+                            data-active={isHovered ? 'true' : undefined}
                             onMouseEnter={() =>
                               setHovered({
                                 type: 'hourly',
@@ -257,7 +261,7 @@ function ActivityHeatmap({ messages }) {
                             className={`relative h-6 sm:h-7 rounded border transition-all duration-150 cursor-pointer flex items-center justify-center ${getIntensityClass(
                               count,
                               maxHourCount
-                            )} ${isPeak ? 'ring-1.5 ring-pink shadow-[0_0_10px_rgba(255,133,187,0.4)]' : ''} ${
+                            )} ${isPeak ? 'ring-2 ring-pink dark:shadow-[0_0_12px_rgba(255,133,187,0.5)] shadow-sm' : ''} ${
                               isHovered ? 'scale-125 shadow-xl brightness-125 z-10' : ''
                             }`}
                           />
@@ -270,8 +274,8 @@ function ActivityHeatmap({ messages }) {
             </div>
           )}
 
-          {/* Simple Minimal Footer (Inspection Text & Scale) */}
-          <div className="mt-5 pt-4 border-t border-white/10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-sans text-cloud/60">
+          {/* Footer (Inspection Text & Scale) */}
+          <div className="mt-5 pt-4 border-t border-glass-divider flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs font-sans text-cloud/60">
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-pink shrink-0" />
               {hovered ? (
@@ -288,7 +292,7 @@ function ActivityHeatmap({ messages }) {
             <div className="flex items-center gap-2 text-cloud/40 shrink-0">
               <span>Quiet</span>
               <div className="flex gap-1 items-center">
-                <div className="w-2.5 h-2.5 rounded-[2px] bg-white/[0.04]" />
+                <div className="w-2.5 h-2.5 rounded-[2px] bg-empty-cell border border-glass-divider" />
                 <div className="w-2.5 h-2.5 rounded-[2px] bg-pink/25" />
                 <div className="w-2.5 h-2.5 rounded-[2px] bg-pink/55" />
                 <div className="w-2.5 h-2.5 rounded-[2px] bg-[#C93F82]" />

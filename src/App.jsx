@@ -29,8 +29,14 @@ import LongestMessage from './components/LongestMessage';
 import Outro from './components/Outro';
 import GlassButton from './components/GlassButton';
 import SettingsModal from './components/SettingsModal';
+import AmbientBackground from './components/AmbientBackground';
+import ThemeToggle from './components/ThemeToggle';
+import { useTheme } from './lib/theme';
+import { installInteractions } from './lib/interactions';
+import SectionErrorBoundary from './components/SectionErrorBoundary';
 
 function App() {
+  const theme = useTheme();
   const [messages, setMessages] = useState(null);
   const [senders, setSenders] = useState(null);
   const [rawSenders, setRawSenders] = useState(null);
@@ -46,6 +52,9 @@ function App() {
   const fileInputRef = useRef(null);
   const addPlatformInputRef = useRef(null);
   const uploadVideoRef = useRef(null);
+
+  // Global reactive layer: scroll parallax, section reveals
+  useEffect(() => installInteractions(), []);
 
   useEffect(() => {
     if (messages) return;
@@ -534,7 +543,9 @@ function App() {
 
   if (!messages) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-night text-cloud px-6 py-12 select-none relative overflow-hidden">
+      <div className="min-h-[100svh] flex flex-col items-center justify-center text-cloud px-5 sm:px-6 pt-24 pb-12 select-none relative overflow-hidden">
+        <AmbientBackground />
+
         {/* Looping background video */}
         <video
           ref={uploadVideoRef}
@@ -542,16 +553,44 @@ function App() {
           muted
           loop
           playsInline
-          className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none motion-reduce:hidden"
+          style={{ opacity: theme.resolved === 'light' ? 0.28 : 0.70 }}
+          className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none motion-reduce:hidden transition-opacity duration-500"
         >
           <source src={bgWebm} type="video/webm" />
           <source src={bgMp4} type="video/mp4" />
         </video>
 
-        {/* Dark gradient overlay between video and card content for legibility */}
-        <div className="fixed inset-0 bg-gradient-to-b from-night/80 via-night/60 to-night/90 pointer-events-none z-0" />
+        {/* Themed gradient overlay between video and card content for legibility */}
+        <div className="fixed inset-0 bg-gradient-to-b from-night/90 via-night/65 to-night/95 pointer-events-none z-0 transition-colors duration-500" />
+
+        {/* Top bar */}
+        <header className="fixed top-0 inset-x-0 z-20 flex items-center justify-between px-5 sm:px-8 pt-[max(1rem,env(safe-area-inset-top))]">
+          <span className="font-serif text-lg font-semibold tracking-tight text-cloud">
+            areuagood<span className="text-pink">couple</span>
+          </span>
+          <div className="glass glass-strong rounded-full p-1">
+            <ThemeToggle resolved={theme.resolved} onToggle={theme.toggle} />
+          </div>
+        </header>
 
         <div className="w-full max-w-lg flex flex-col items-center relative z-10">
+          {!pendingChat && (
+            <div className="text-center mb-8 animate-fade-in">
+              <span className="glass-chip inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-[11px] font-sans font-semibold text-cloud/80 mb-5">
+                <svg className="w-3.5 h-3.5 text-pink" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden="true">
+                  <rect x="4" y="11" width="16" height="10" rx="2.5" />
+                  <path d="M8 11V7a4 4 0 118 0v4" strokeLinecap="round" />
+                </svg>
+                100% private · nothing leaves your device
+              </span>
+              <h1 className="font-serif text-[2.6rem] leading-[1.05] sm:text-6xl font-semibold tracking-tight text-cloud">
+                Your love story,
+                <br />
+                <span className="italic font-normal text-pink">in messages.</span>
+              </h1>
+            </div>
+          )}
+
           {/* Main Drop / Upload / Confirmation Card */}
           <div
             onClick={() => !pendingChat && !isParsing && fileInputRef.current?.click()}
@@ -559,13 +598,14 @@ function App() {
             onDragEnter={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`w-full glass rounded-3xl p-8 sm:p-10 flex flex-col items-center text-center transition-all duration-300 border-2 ${
+            className={`w-full glass glass-strong rounded-[32px] p-7 sm:p-10 flex flex-col items-center text-center transition-all duration-500 ${
               pendingChat
-                ? 'border-white/20 shadow-2xl cursor-default'
+                ? 'cursor-default animate-pop-in'
                 : isDragging
-                ? 'border-pink bg-pink/20 scale-[1.02] shadow-2xl ring-4 ring-pink/20 cursor-pointer'
-                : 'border-white/15 hover:border-pink/60 shadow-xl cursor-pointer group'
+                ? 'scale-[1.03] cursor-copy ring-2 ring-pink/70 shadow-[0_0_80px_-10px_var(--color-pink)]'
+                : 'cursor-pointer group glass-lift'
             }`}
+            style={{ transitionTimingFunction: 'var(--ease-spring)' }}
           >
             {pendingChat ? (
               // ----------------- PENDING CONFIRMATION & MAPPING STEP -----------------
@@ -573,7 +613,7 @@ function App() {
                 {pendingChat.isBatch ? (
                   // Multi-Platform Batch Mapping View
                   <>
-                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/[0.06] border border-white/20 text-cloud text-xs font-semibold mb-5 shadow-sm">
+                    <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full glass-chip text-cloud text-xs font-semibold mb-5 shadow-sm">
                       <span className="w-2 h-2 rounded-full bg-pink animate-pulse" />
                       <span>
                         Detected:{' '}
@@ -612,14 +652,14 @@ function App() {
                             : 'WhatsApp';
                         const pColor =
                           p.platform === 'instagram'
-                            ? 'text-purple-300'
+                            ? 'text-ig-pink'
                             : p.platform === 'telegram'
-                            ? 'text-sky-300'
-                            : 'text-emerald-300';
+                            ? 'text-tg-pink'
+                            : 'text-wa-pink';
                         return (
                           <div
                             key={p.platform}
-                            className="w-full bg-white/[0.04] border border-white/10 rounded-2xl p-4 sm:p-5 text-left"
+                            className="w-full glass-chip rounded-2xl p-4 sm:p-5 text-left border border-glass-divider"
                           >
                             <div className="flex items-center justify-between mb-3">
                               <span className={`font-sans text-xs uppercase tracking-wider font-semibold ${pColor}`}>
@@ -639,7 +679,7 @@ function App() {
                                 <select
                                   value={p.her}
                                   onChange={(e) => handleBatchHerChange(p.platform, e.target.value)}
-                                  className="w-full bg-night border border-white/20 rounded-xl px-3 py-2 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                                  className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
                                 >
                                   {p.rawSenders.map((s) => (
                                     <option key={s} value={s} className="bg-night text-cloud">
@@ -657,7 +697,7 @@ function App() {
                                 <select
                                   value={p.him}
                                   onChange={(e) => handleBatchHimChange(p.platform, e.target.value)}
-                                  className="w-full bg-night border border-white/20 rounded-xl px-3 py-2 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                                  className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
                                 >
                                   {p.rawSenders.map((s) => (
                                     <option key={s} value={s} className="bg-night text-cloud">
@@ -673,7 +713,7 @@ function App() {
                     </div>
 
                     <div className="w-full flex flex-col items-center gap-3">
-                      <GlassButton text="Confirm &amp; Unify Chats ✨" onClick={handleConfirmPending} />
+                      <GlassButton text="Confirm &amp; Unify Chats ✨" onClick={handleConfirmPending} icon="sparkle" />
                       <button
                         type="button"
                         onClick={handleResetChat}
@@ -688,21 +728,21 @@ function App() {
                   <>
                     {/* Detected Platform Badge */}
                     {pendingChat.platform === 'instagram' ? (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-purple-950/40 border border-purple-500/40 text-purple-300 text-xs font-semibold mb-5 shadow-sm">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-ig-pink/15 border border-ig-pink/40 text-ig-pink text-xs font-semibold mb-5 shadow-sm">
                         <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                         </svg>
                         <span>Detected: Instagram DM export</span>
                       </div>
                     ) : pendingChat.platform === 'telegram' ? (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-sky-500/20 border border-sky-400/40 text-sky-300 text-xs font-semibold mb-5 shadow-sm">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-tg-pink/15 border border-tg-pink/40 text-tg-pink text-xs font-semibold mb-5 shadow-sm">
                         <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.75-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .37z" />
                         </svg>
                         <span>Detected: Telegram export</span>
                       </div>
                     ) : (
-                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-xs font-semibold mb-5 shadow-sm">
+                      <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-wa-pink/15 border border-wa-pink/40 text-wa-pink text-xs font-semibold mb-5 shadow-sm">
                         <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="currentColor">
                           <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91C2.13 13.66 2.59 15.36 3.45 16.86L2.05 22L7.3 20.62C8.75 21.41 10.38 21.83 12.04 21.83C17.5 21.83 21.95 17.38 21.95 11.92C21.95 9.27 20.92 6.78 19.05 4.91C17.18 3.03 14.69 2 12.04 2M12.05 3.67C14.25 3.67 16.31 4.53 17.87 6.09C19.42 7.65 20.28 9.72 20.28 11.92C20.28 16.46 16.58 20.15 12.04 20.15C10.56 20.15 9.11 19.76 7.85 19.01L7.55 18.83L4.43 19.65L5.26 16.61L5.06 16.29C4.24 14.99 3.81 13.47 3.81 11.91C3.81 7.37 7.5 3.67 12.05 3.67Z" />
                         </svg>
@@ -723,7 +763,7 @@ function App() {
                     </p>
 
                     {/* Nickname Mapping Dropdowns */}
-                    <div className="w-full bg-white/[0.04] border border-white/10 rounded-2xl p-4 sm:p-5 mb-6 text-left">
+                    <div className="w-full glass-chip rounded-2xl p-4 sm:p-5 mb-6 text-left border border-glass-divider">
                       <div className="flex items-center justify-between mb-3">
                         <span className="font-sans text-xs uppercase tracking-wider text-pink font-semibold">
                           Map to Her &amp; Him
@@ -741,7 +781,7 @@ function App() {
                           <select
                             value={pendingChat.her}
                             onChange={(e) => handlePendingHerChange(e.target.value)}
-                            className="w-full bg-night border border-white/20 rounded-xl px-3 py-2 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                            className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
                           >
                             {pendingChat.rawSenders.map((s) => (
                               <option key={s} value={s} className="bg-night text-cloud">
@@ -760,7 +800,7 @@ function App() {
                           <select
                             value={pendingChat.him}
                             onChange={(e) => handlePendingHimChange(e.target.value)}
-                            className="w-full bg-night border border-white/20 rounded-xl px-3 py-2 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                            className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
                           >
                             {pendingChat.rawSenders.map((s) => (
                               <option key={s} value={s} className="bg-night text-cloud">
@@ -774,7 +814,7 @@ function App() {
 
                     {/* Primary Action Button */}
                     <div className="w-full flex flex-col items-center gap-3">
-                      <GlassButton text="Confirm &amp; Explore ✨" onClick={handleConfirmPending} />
+                      <GlassButton text="Confirm &amp; Explore ✨" onClick={handleConfirmPending} icon="sparkle" />
 
                       <button
                         type="button"
@@ -791,7 +831,7 @@ function App() {
               // ----------------- DEFAULT INITIAL DROPZONE -----------------
               <>
                 {/* Upload Icon Badge */}
-                <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center text-pink mb-6 shadow-sm group-hover:scale-110 transition-transform">
+                <div className="w-16 h-16 rounded-2xl glass-chip flex items-center justify-center text-pink mb-6 shadow-sm group-hover:scale-110 transition-transform">
                   {isParsing ? (
                     <svg className="w-8 h-8 text-pink animate-spin" viewBox="0 0 24 24" fill="none">
                       <circle
@@ -827,15 +867,15 @@ function App() {
 
                 <p className="font-sans text-cloud/60 text-sm mb-6 max-w-sm">
                   Drag &amp; drop your WhatsApp{' '}
-                  <code className="text-pink bg-white/10 px-1.5 py-0.5 rounded font-mono font-semibold">
+                  <code className="text-wa-pink bg-track px-1.5 py-0.5 rounded font-mono font-semibold">
                     .txt
                   </code>
                   , Telegram{' '}
-                  <code className="text-sky-300 bg-white/10 px-1.5 py-0.5 rounded font-mono font-semibold">
+                  <code className="text-tg-pink bg-track px-1.5 py-0.5 rounded font-mono font-semibold">
                     .json
                   </code>
                   , or Instagram{' '}
-                  <code className="text-purple-300 bg-white/10 px-1.5 py-0.5 rounded font-mono font-semibold">
+                  <code className="text-ig-pink bg-track px-1.5 py-0.5 rounded font-mono font-semibold">
                     message_*.json
                   </code>{' '}
                   files here, or click to browse.
@@ -910,7 +950,7 @@ function App() {
                 <strong className="text-cloud/80">Instagram:</strong> Settings → Your activity →{' '}
                 <strong className="text-cloud/80">Download your information</strong> → format:{' '}
                 <strong className="text-cloud/80">JSON</strong> → select one or all{' '}
-                <code className="text-purple-300 font-mono">message_N.json</code> files.
+                <code className="text-ig-pink font-mono">message_N.json</code> files.
               </p>
             </div>
           )}
@@ -939,8 +979,10 @@ function App() {
 
 
   return (
-    <div className="bg-night text-cloud relative">
-      <QuickNav messages={validMessages} onOpenSettings={() => setIsSettingsOpen(true)} />
+    <div className="text-cloud relative min-h-screen pb-28 md:pb-12">
+      <AmbientBackground />
+
+      <QuickNav messages={validMessages} onOpenSettings={() => setIsSettingsOpen(true)} theme={theme} />
 
       {/* Settings Modal */}
       <SettingsModal
@@ -954,6 +996,7 @@ function App() {
         currentMapping={{ her: currentHerSender, him: currentHimSender }}
         onSaveMapping={handleSaveSettingsMapping}
         onResetChat={handleResetChat}
+        theme={theme}
       />
 
       {/* Hidden file input for linking additional platforms */}
@@ -971,17 +1014,22 @@ function App() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night/80 backdrop-blur-md animate-fade-in"
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in"
+          style={{ background: 'var(--scrim)', WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)' }}
           onClick={() => setPendingAdditionalChat(null)}
         >
           <div
-            className="w-full max-w-md glass border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative select-none"
+            className="w-full sm:max-w-md glass glass-strong rounded-t-[32px] sm:rounded-[32px] px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-8 relative select-none animate-sheet-up"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Sheet grabber (mobile) */}
+            <div className="sm:hidden mx-auto mb-4 h-1.5 w-10 rounded-full" style={{ backgroundColor: 'var(--modal-grabber)' }} aria-hidden="true" />
+
             <button
               type="button"
               onClick={() => setPendingAdditionalChat(null)}
-              className="absolute top-5 right-5 text-cloud/40 hover:text-cloud transition-colors p-1 rounded-full cursor-pointer"
+              className="lg-icon-btn absolute top-4 right-4 sm:top-5 sm:right-5"
+              aria-label="Close"
             >
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
@@ -992,7 +1040,7 @@ function App() {
               Link {pendingAdditionalChat.platform === 'instagram' ? 'Instagram' : pendingAdditionalChat.platform === 'telegram' ? 'Telegram' : 'WhatsApp'}
             </span>
 
-            <h3 className="font-serif text-xl sm:text-2xl text-cloud font-semibold mb-2">
+            <h3 className="font-serif text-2xl text-cloud font-semibold mb-2">
               Assign Chat Names
             </h3>
 
@@ -1018,7 +1066,7 @@ function App() {
                     }
                     setPendingAdditionalChat((prev) => ({ ...prev, her: val, him: nextHim }));
                   }}
-                  className="w-full bg-night/90 border border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                  className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
                 >
                   {pendingAdditionalChat.rawSenders.map((s) => (
                     <option key={s} value={s} className="bg-night text-cloud">
@@ -1044,7 +1092,7 @@ function App() {
                     }
                     setPendingAdditionalChat((prev) => ({ ...prev, her: nextHer, him: val }));
                   }}
-                  className="w-full bg-night/90 border border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                  className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
                 >
                   {pendingAdditionalChat.rawSenders.map((s) => (
                     <option key={s} value={s} className="bg-night text-cloud">
@@ -1056,7 +1104,7 @@ function App() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <GlassButton text="Link &amp; Merge Platform ✨" onClick={handleConfirmAdditionalPlatform} />
+              <GlassButton text="Link &amp; Merge Platform ✨" onClick={handleConfirmAdditionalPlatform} icon="sparkle" />
               <button
                 type="button"
                 onClick={() => setPendingAdditionalChat(null)}
@@ -1069,37 +1117,76 @@ function App() {
         </div>
       )}
 
-      <Hero
-        messages={validMessages}
-        senders={senders}
-        herName={currentHerSender}
-        himName={currentHimSender}
-        rawSenders={rawSenders}
-      />
-      <CrossPlatformStats
-        messages={validMessages}
-        loadedPlatforms={loadedPlatforms}
-        onAddPlatform={() => addPlatformInputRef.current?.click()}
-      />
-      <Milestones messages={validMessages} senders={senders} />
-      <CalendarHeat messages={validMessages} senders={senders} />
-      <Highlights messages={validMessages} senders={senders} />
-      <ReelStats messages={validMessages} senders={senders} />
-      <MediaBreakdown messages={validMessages} senders={senders} />
-      <ActivityHeatmap messages={validMessages} senders={senders} />
-      <Initiator messages={validMessages} senders={senders} />
-      <ResponseTime messages={validMessages} senders={senders} />
-      <LoveWords messages={validMessages} senders={senders} />
-      <KeywordSearch messages={validMessages} senders={senders} />
-      <EmojiStats messages={validMessages} senders={senders} />
-      <ReactionStats messages={validMessages} senders={senders} />
-      <div id="word-cloud">
-        <WordCloud messages={validMessages} senders={senders} />
-      </div>
-      <RandomMemory messages={validMessages} senders={senders} />
-      <CalloutStreak messages={validMessages} senders={senders} />
-      <LongestMessage messages={validMessages} senders={senders} />
-      <Outro messages={validMessages} senders={senders} />
+      <SectionErrorBoundary name="Hero">
+        <Hero
+          messages={validMessages}
+          senders={senders}
+          herName={currentHerSender}
+          himName={currentHimSender}
+          rawSenders={rawSenders}
+          theme={theme}
+        />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="CrossPlatformStats">
+        <CrossPlatformStats
+          messages={validMessages}
+          loadedPlatforms={loadedPlatforms}
+          onAddPlatform={() => addPlatformInputRef.current?.click()}
+        />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="Milestones">
+        <Milestones messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="CalendarHeat">
+        <CalendarHeat messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="Highlights">
+        <Highlights messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="ReelStats">
+        <ReelStats messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="MediaBreakdown">
+        <MediaBreakdown messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="ActivityHeatmap">
+        <ActivityHeatmap messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="Initiator">
+        <Initiator messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="ResponseTime">
+        <ResponseTime messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="LoveWords">
+        <LoveWords messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="KeywordSearch">
+        <KeywordSearch messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="EmojiStats">
+        <EmojiStats messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="ReactionStats">
+        <ReactionStats messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="WordCloud">
+        <div id="word-cloud">
+          <WordCloud messages={validMessages} senders={senders} />
+        </div>
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="RandomMemory">
+        <RandomMemory messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="CalloutStreak">
+        <CalloutStreak messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="LongestMessage">
+        <LongestMessage messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
+      <SectionErrorBoundary name="Outro">
+        <Outro messages={validMessages} senders={senders} />
+      </SectionErrorBoundary>
     </div>
   );
 }

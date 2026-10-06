@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import gsap from 'gsap';
 import { getKeywordStats } from '../lib/stats';
+import CountUp from './CountUp';
 
 function KeywordSearch({ messages }) {
   const [keyword, setKeyword] = useState('');
@@ -50,7 +51,6 @@ function KeywordSearch({ messages }) {
         workerRef.current = null;
       };
     } catch {
-      // In environments where Worker might be unavailable, fallback to main thread
       workerRef.current = null;
     }
   }, [messages]);
@@ -92,7 +92,6 @@ function KeywordSearch({ messages }) {
         payload: { searchId: nextId, keyword: debouncedKeyword },
       });
     } else {
-      // Linear pass fallback on parsed messages
       const res = getKeywordStats(messages, debouncedKeyword);
       setStats(res);
       setIsSearching(false);
@@ -121,11 +120,17 @@ function KeywordSearch({ messages }) {
   };
 
   return (
-    <section id="search" className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-night">
-      <div className="relative z-10">
-        <p className="font-sans text-pink/80 text-sm mb-4 sm:mb-8">a word, counted</p>
+    <section id="search" className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32">
+      <div className="relative z-10 max-w-3xl mx-auto w-full">
+        <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold mb-3">
+          a word, counted
+        </p>
 
-        <div className="max-w-2xl glass rounded-3xl p-6 sm:p-8">
+        <h2 data-reveal="2" className="sr-only">
+          Search keyword history
+        </h2>
+
+        <div className="glass glass-lift rounded-3xl p-6 sm:p-9 shadow-xl">
           <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug">
             how many times did we say{' '}
             <input
@@ -134,7 +139,7 @@ function KeywordSearch({ messages }) {
               onChange={handleInputChange}
               placeholder="sorry"
               style={{ width: `${Math.max(keyword.length, 5)}ch` }}
-              className="bg-transparent border-b-2 border-white/30 focus:border-pink outline-none text-pink placeholder:text-white/20 font-serif italic px-1"
+              className="bg-transparent border-b-2 border-glass-divider focus:border-pink outline-none text-pink placeholder:text-cloud/30 font-serif italic px-1 transition-colors"
             />
             {' '}?
             {isSearching && (
@@ -147,38 +152,38 @@ function KeywordSearch({ messages }) {
               </span>
             )}
           </p>
-        </div>
 
-        {stats && (
-          <div ref={resultRef} className="mt-12 sm:mt-16 max-w-2xl">
-            <div className="flex items-baseline gap-4">
-              <span className="font-serif font-semibold text-pink text-6xl sm:text-7xl">
-                {stats.count.toLocaleString()}
-              </span>
-              <span className="font-sans text-cloud/70 text-sm">
-                times{stats.count > 0 && stats.topHour !== null ? `, mostly around ${hourLabel(stats.topHour)}` : ''}
-                {stats.avgGapDays ? `, every ${stats.avgGapDays.toFixed(1)} days on average` : ''}
-              </span>
-            </div>
-
-            {/* timeline: dot per occurrence, sampled to prevent DOM freezes */}
-            {stats.count > 0 && span > 0 && stats.timelineTimestamps?.length > 0 && (
-              <div className="relative mt-8 h-8">
-                <div className="absolute top-1/2 left-0 right-0 h-px bg-white/20" />
-                {stats.timelineTimestamps.map((ts, i) => {
-                  const pct = Math.max(0, Math.min(100, ((ts - firstTime) / span) * 100));
-                  return (
-                    <div
-                      key={i}
-                      className="absolute top-1/2 w-2 h-2 rounded-full bg-pink -translate-x-1/2 -translate-y-1/2 pointer-events-none"
-                      style={{ left: `${pct}%` }}
-                    />
-                  );
-                })}
+          {stats && (
+            <div ref={resultRef} className="mt-8 pt-6 border-t border-glass-divider">
+              <div className="flex flex-col sm:flex-row sm:items-baseline gap-2 sm:gap-4">
+                <span className="font-serif font-semibold text-pink text-5xl sm:text-7xl">
+                  <CountUp value={stats.count} />
+                </span>
+                <span className="font-sans text-cloud/70 text-sm sm:text-base font-medium">
+                  times{stats.count > 0 && stats.topHour !== null ? `, mostly around ${hourLabel(stats.topHour)}` : ''}
+                  {stats.avgGapDays ? `, every ${stats.avgGapDays.toFixed(1)} days on average` : ''}
+                </span>
               </div>
-            )}
-          </div>
-        )}
+
+              {/* timeline: dot per occurrence, sampled to prevent DOM freezes */}
+              {stats.count > 0 && span > 0 && stats.timelineTimestamps?.length > 0 && (
+                <div className="relative mt-8 h-8 px-2">
+                  <div className="absolute top-1/2 left-2 right-2 h-0.5 bg-[var(--glass-divider)] rounded-full" />
+                  {stats.timelineTimestamps.map((ts, i) => {
+                    const pct = Math.max(0, Math.min(100, ((ts - firstTime) / span) * 100));
+                    return (
+                      <div
+                        key={i}
+                        className="absolute top-1/2 w-2.5 h-2.5 rounded-full bg-pink -translate-x-1/2 -translate-y-1/2 pointer-events-none dark:shadow-[0_0_8px_var(--color-pink)] shadow-sm"
+                        style={{ left: `${pct}%` }}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </section>
   );

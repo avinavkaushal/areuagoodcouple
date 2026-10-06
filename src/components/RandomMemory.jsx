@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import gsap from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { getRandomMemory } from '../lib/stats';
+import GlassButton from './GlassButton';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -48,43 +49,47 @@ function RandomMemory({ messages }) {
     <section
       id="memories"
       ref={sectionRef}
-      className="relative overflow-hidden flex flex-col justify-center px-8 sm:px-16 py-24 sm:py-32 bg-navy"
+      className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32"
     >
-      <div className="memory-container relative z-10 max-w-2xl">
-        <p className="font-sans text-blush/70 text-sm mb-4 sm:mb-8">a random bookmark</p>
+      <div className="memory-container relative z-10 max-w-3xl mx-auto w-full">
+        <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold mb-3">
+          a random bookmark
+        </p>
 
-        <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4 mb-10 sm:mb-14">
-          <p className="font-serif text-cloud text-3xl sm:text-5xl leading-snug">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 sm:mb-12">
+          <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight font-semibold">
             frozen in time.
-          </p>
+          </h2>
 
-          <button
-            type="button"
+          <GlassButton
+            text="Roll another memory"
             onClick={pickMemory}
-            className="self-start sm:self-auto px-5 py-2.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/20 text-cloud text-xs font-sans font-semibold tracking-wide active:scale-95 transition-all duration-200 cursor-pointer shadow-md hover:shadow-lg"
-          >
-            Roll another memory
-          </button>
+            icon="sparkle"
+            className="self-start sm:self-auto shrink-0"
+          />
         </div>
 
-        {/* Quoted conversation block */}
-        <div ref={cardRef} className="glass rounded-3xl p-6 sm:p-8 space-y-4 shadow-sm">
-          <div className="space-y-3">
+        {/* Quoted conversation block with Apple iMessage liquid bubble aesthetic */}
+        <div ref={cardRef} className="glass glass-lift rounded-3xl p-6 sm:p-9 space-y-5">
+          <div className="space-y-4">
             {memory.messages.map((m, idx) => (
-              <div key={idx} className="space-y-1">
+              <div key={idx} className="space-y-1.5">
                 <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-pink inline-block dark:shadow-[0_0_8px_var(--color-pink)]" />
                   <span className="font-sans font-bold text-xs text-pink">{m.sender}</span>
                 </div>
-                <p className="font-serif italic text-cloud/90 text-base sm:text-lg leading-relaxed pl-2 border-l-2 border-pink/60">
-                  &ldquo;{m.text}&rdquo;
-                </p>
+                <div className="glass-chip rounded-2xl p-4 sm:p-5 border border-glass-divider">
+                  <p className="font-serif italic text-cloud text-base sm:text-lg leading-relaxed">
+                    &ldquo;{m.text}&rdquo;
+                  </p>
+                </div>
               </div>
             ))}
           </div>
 
-          <div className="pt-4 border-t border-white/10 flex justify-between items-center text-xs font-sans text-cloud/50">
-            <span>Sent on {memory.date}</span>
-            <span>{memory.time}</span>
+          <div className="pt-4 border-t border-glass-divider flex justify-between items-center text-xs font-sans text-cloud/50">
+            <span>Sent on <strong className="text-cloud/80 font-semibold">{memory.date}</strong></span>
+            <span className="font-mono text-cloud/40">{memory.time}</span>
           </div>
         </div>
       </div>

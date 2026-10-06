@@ -1,98 +1,551 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   DESIGN TOKENS
+   Palette is theme-aware: utilities like `text-cloud` / `bg-night` resolve to
+   CSS variables that are re-declared per theme ([data-theme="light"|"dark"]).
+   `cloud` = primary foreground, `night`/`midnight`/`navy` = canvas surfaces.
+   ========================================================================== */
 @theme {
-  --color-navy: #021A54;
-  --color-night: #010F33;
-  --color-midnight: #010A24;
+  /* Deep ink-navy scale (darkened from the original #021A54 / #010F33) */
+  --color-midnight: #000412;
+  --color-night: #00081F;
+  --color-navy: #03113D;
+  --color-ink: #00081F;
+  --color-azure: #4C7DFF;
   --color-pink: #FF85BB;
   --color-blush: #FFCEE3;
-  --color-cloud: #F5F5F5;
   --color-deeppink: #C93F82;
+  --color-on-pink: #00081F;
+
+  /* Platform-specific pink nuances */
+  --color-wa-pink: #FF7597;  /* WhatsApp: warm coral-rose pink */
+  --color-tg-pink: #F4A5D8;  /* Telegram: soft ethereal orchid pink */
+  --color-ig-pink: #DE3B94;  /* Instagram: sunset fuchsia magenta */
+  --color-cloud: #F2F4FA;
+
   --font-serif: 'Fraunces', serif;
   --font-sans: 'Manrope', sans-serif;
+
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-fade-in: fade-in 0.5s var(--ease-out-expo) both;
+  --animate-sheet-up: sheet-up 0.55s var(--ease-out-expo) both;
+  --animate-pop-in: pop-in 0.5s var(--ease-spring) both;
 }
 
-html, body {
-  background-color: var(--color-night);
-  color: var(--color-cloud);
-  font-family: var(--font-sans);
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sheet-up {
+  from { opacity: 0; transform: translateY(32px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes pop-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+
+/* ---------- Theme surfaces & glass material variables ---------- */
+:root,
+[data-theme='dark'] {
+  --color-midnight: #000412;
+  --color-night: #00081F;
+  --color-navy: #03113D;
+  --color-cloud: #F2F4FA;
+  --color-white: #FFFFFF;
+  --color-pink: #FF85BB;
+  --color-blush: #FFCEE3;
+  --color-deeppink: #C93F82;
+  --color-on-pink: #00081F;
+
+  /* Platform-specific pink nuances (Dark Mode) */
+  --color-wa-pink: #FF7597;  /* WhatsApp: warm coral-rose pink */
+  --color-tg-pink: #F4A5D8;  /* Telegram: soft ethereal orchid pink */
+  --color-ig-pink: #DE3B94;  /* Instagram: sunset fuchsia magenta */
+
+  --canvas: #00081F;
+  --orb-1: rgba(255, 133, 187, 0.22);
+  --orb-2: rgba(76, 125, 255, 0.24);
+  --orb-3: rgba(124, 77, 255, 0.16);
+
+  --glass-bg: rgba(10, 22, 66, 0.42);
+  --glass-hi: rgba(255, 255, 255, 0.10);
+  --glass-lo: rgba(4, 10, 36, 0.38);
+  --glass-border: rgba(255, 255, 255, 0.10);
+  --glass-rim: rgba(255, 255, 255, 0.55);
+  --glass-rim-accent: rgba(255, 133, 187, 0.40);
+  --glass-specular: rgba(255, 255, 255, 0.22);
+  --glass-shade: rgba(0, 0, 0, 0.28);
+  --glass-shadow: rgba(0, 2, 14, 0.65);
+  --glass-strong-bg: rgba(6, 15, 50, 0.72);
+  --scrim: rgba(0, 4, 18, 0.62);
+  --field-bg: rgba(0, 8, 31, 0.6);
+
+  /* Semantic surface & UI tokens (Dark Mode) */
+  --glass-divider: rgba(255, 255, 255, 0.10);
+  --track-bg: rgba(255, 255, 255, 0.06);
+  --empty-cell: rgba(255, 255, 255, 0.08);
+  --chip-bg: rgba(255, 255, 255, 0.07);
+  --chip-border: rgba(255, 255, 255, 0.12);
+  --field-border: rgba(255, 255, 255, 0.16);
+  --nav-shadow: 0 16px 40px -8px rgba(0, 2, 14, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  --pill-inactive-hover: rgba(255, 255, 255, 0.10);
+  --modal-grabber: rgba(255, 255, 255, 0.25);
+
   color-scheme: dark;
 }
 
-.glass {
-  background: rgba(4, 21, 68, 0.55);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow:
-    inset 0 1px 1px rgba(255, 255, 255, 0.15),
-    0 12px 36px rgba(0, 0, 0, 0.45);
+[data-theme='light'] {
+  --color-midnight: #DCE3F3;
+  --color-night: #EEF2FA;
+  --color-navy: #E4EAF7;
+  --color-cloud: #0A1433;
+  --color-white: #FFFFFF;    /* True white restored for crisp highlights & icons */
+  --color-pink: #D23A80;     /* Calibrated accessible vibrant rose */
+  --color-blush: #7B3F9E;    /* Calibrated rich warm orchid/plum for distinct P1 vs P2 */
+  --color-deeppink: #B02A6B;
+  --color-on-pink: #FFFFFF;
+
+  /* Platform-specific pink nuances (Light Mode - WCAG AA compliant > 4.8:1) */
+  --color-wa-pink: #D82B61;  /* WhatsApp: rich coral-rose */
+  --color-tg-pink: #9E3782;  /* Telegram: deep vibrant orchid magenta */
+  --color-ig-pink: #B51774;  /* Instagram: deep sunset raspberry */
+
+  --canvas: #EEF2FA;
+  --orb-1: rgba(255, 133, 187, 0.28);
+  --orb-2: rgba(76, 125, 255, 0.20);
+  --orb-3: rgba(160, 120, 255, 0.18);
+
+  /* Light Liquid Glass Material */
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-hi: rgba(255, 255, 255, 0.92);
+  --glass-lo: rgba(242, 246, 254, 0.52);
+  --glass-border: rgba(10, 20, 51, 0.08);
+  --glass-rim: rgba(255, 255, 255, 0.95);
+  --glass-rim-accent: rgba(210, 58, 128, 0.35);
+  --glass-specular: rgba(255, 255, 255, 0.98);
+  --glass-shade: rgba(10, 20, 51, 0.04);
+  --glass-shadow: rgba(24, 38, 77, 0.10);
+  --glass-strong-bg: rgba(255, 255, 255, 0.85);
+  --scrim: rgba(220, 227, 243, 0.65);
+  --field-bg: rgba(255, 255, 255, 0.85);
+
+  /* Semantic surface & UI tokens (Light Mode) */
+  --glass-divider: rgba(10, 20, 51, 0.08);
+  --track-bg: rgba(10, 20, 51, 0.06);
+  --empty-cell: rgba(10, 20, 51, 0.07);
+  --chip-bg: rgba(255, 255, 255, 0.72);
+  --chip-border: rgba(10, 20, 51, 0.08);
+  --field-border: rgba(10, 20, 51, 0.14);
+  --nav-shadow: 0 12px 32px -6px rgba(20, 35, 75, 0.14), 0 2px 8px -2px rgba(20, 35, 75, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95);
+  --pill-inactive-hover: rgba(10, 20, 51, 0.06);
+  --modal-grabber: rgba(10, 20, 51, 0.20);
+
+  color-scheme: light;
 }
 
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+:root {
+  --glass-blur: 14px;
+  --glass-saturate: 170%;
+  --scroll: 0;
 }
 
-.glass-button {
-  position: relative !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-height: 52px !important;
-  min-width: 180px !important;
-  padding: 14px 32px !important;
-  border-radius: 9999px !important;
-  background: #021A54 !important;
-  background: linear-gradient(135deg, #0A266E 0%, #173272 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  color: #FFFFFF !important;
-  cursor: pointer !important;
-  pointer-events: auto !important;
-  box-shadow: 0 10px 25px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(2, 26, 84, 0.3) !important;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-  user-select: none !important;
-  overflow: hidden !important;
-  text-decoration: none !important;
+@media (min-width: 768px) {
+  :root {
+    --glass-blur: 22px;
+  }
 }
 
-.glass-button:hover {
-  transform: translateY(-2px) scale(1.02) !important;
-  box-shadow: 0 16px 36px -4px rgba(201, 63, 130, 0.4), 0 6px 12px -2px rgba(2, 26, 84, 0.3) !important;
-  background: linear-gradient(135deg, #0A266E 0%, #C93F82 100%) !important;
-  border-color: rgba(255, 133, 187, 0.4) !important;
+/* ==========================================================================
+   BASE
+   ========================================================================== */
+@layer base {
+  html,
+  body {
+    background-color: var(--canvas);
+    color: var(--color-cloud);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    transition: background-color 0.5s ease, color 0.5s ease;
+  }
+
+  body {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  ::selection {
+    background: color-mix(in oklab, var(--color-pink) 40%, transparent);
+  }
+
+  /* Springy press feedback for every button */
+  button:not(:disabled) {
+    transition-property: color, background-color, border-color, box-shadow, opacity, scale, translate;
+    transition-duration: 0.25s;
+    transition-timing-function: var(--ease-out-expo);
+  }
+  button:not(:disabled):active {
+    scale: 0.96;
+    transition-duration: 0.08s;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--color-azure);
+    outline-offset: 3px;
+    border-radius: 12px;
+  }
+
+  select option {
+    background: var(--color-night);
+    color: var(--color-cloud);
+  }
+
+  /* Tabular numerals keep stat counters from jittering while counting */
+  .font-serif {
+    font-variant-numeric: lining-nums;
+  }
 }
 
-.glass-button:active {
-  transform: translateY(0) scale(0.98) !important;
+/* ==========================================================================
+   COMPONENTS — Liquid Glass material
+   Kept in @layer components so Tailwind utilities can still override.
+   ========================================================================== */
+@layer components {
+  .glass {
+    position: relative;
+    isolation: isolate;
+    background:
+      linear-gradient(165deg, var(--glass-hi) 0%, transparent 38%),
+      linear-gradient(var(--glass-bg), var(--glass-lo));
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturate));
+    border: 1px solid var(--glass-border);
+    box-shadow:
+      inset 0 1px 0 var(--glass-specular),
+      inset 0 -1px 0 var(--glass-shade),
+      0 1px 2px var(--glass-shade),
+      0 22px 48px -18px var(--glass-shadow);
+    transition:
+      translate 0.6s var(--ease-spring),
+      box-shadow 0.5s var(--ease-out-expo),
+      border-color 0.5s var(--ease-out-expo),
+      background-color 0.5s ease;
+  }
+
+  /* Specular rim: a gradient hairline that catches "light" on the top-left edge */
+  .glass::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      140deg,
+      var(--glass-rim) 0%,
+      transparent 28%,
+      transparent 70%,
+      var(--glass-rim-accent) 100%
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) content-box exclude,
+      linear-gradient(#000 0 0);
+    opacity: 0.7;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+  }
+
+  @media (hover: hover) {
+    .glass:hover {
+      border-color: color-mix(in oklab, var(--color-white) 18%, transparent);
+    }
+    .glass:hover::before {
+      opacity: 1;
+    }
+    .glass-lift:hover {
+      translate: 0 -3px;
+      box-shadow:
+        inset 0 1px 0 var(--glass-specular),
+        inset 0 -1px 0 var(--glass-shade),
+        0 2px 4px var(--glass-shade),
+        0 32px 64px -20px var(--glass-shadow);
+    }
+  }
+
+  /* Elevated variant: navigation, popovers, modals */
+  .glass-strong {
+    background:
+      linear-gradient(165deg, var(--glass-hi) 0%, transparent 40%),
+      var(--glass-strong-bg);
+    --glass-blur: 28px;
+  }
+
+  /* Form field on glass */
+  .glass-field {
+    background: var(--field-bg);
+    border: 1px solid var(--field-border);
+    border-radius: 14px;
+    color: var(--color-cloud);
+    box-shadow: inset 0 1px 2px var(--glass-shade);
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+  .glass-field:focus {
+    outline: none;
+    border-color: var(--color-pink);
+    box-shadow:
+      inset 0 1px 2px var(--glass-shade),
+      0 0 0 4px color-mix(in oklab, var(--color-pink) 22%, transparent);
+  }
+
+  /* Small glass chip / pill */
+  .glass-chip {
+    background: var(--chip-bg);
+    border: 1px solid var(--chip-border);
+    -webkit-backdrop-filter: blur(12px) saturate(160%);
+    backdrop-filter: blur(12px) saturate(160%);
+    box-shadow: inset 0 1px 0 var(--glass-specular);
+  }
+
+  /* -------- Primary liquid glass button -------- */
+  .lg-button {
+    position: relative;
+    isolation: isolate;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+    min-height: 52px;
+    padding: 0.9rem 1.9rem;
+    border-radius: 9999px;
+    color: #fff;
+    font-family: var(--font-sans);
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    overflow: hidden;
+    background:
+      radial-gradient(120% 140% at 50% 0%, rgba(255, 255, 255, 0.28), transparent 55%),
+      linear-gradient(135deg, #0B2A8A 0%, #1B3FB8 55%, #C93F82 140%);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.45),
+      inset 0 -2px 6px rgba(0, 0, 0, 0.25),
+      0 10px 28px -8px rgba(27, 63, 184, 0.65),
+      0 2px 6px rgba(0, 0, 0, 0.25);
+    translate: var(--tx, 0) var(--ty, 0);
+    transition:
+      translate 0.5s var(--ease-spring),
+      scale 0.4s var(--ease-spring),
+      box-shadow 0.4s var(--ease-out-expo),
+      filter 0.3s ease;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .lg-button::after {
+    content: '';
+    position: absolute;
+    inset: 1px 10% auto;
+    height: 45%;
+    border-radius: 9999px;
+    background: linear-gradient(rgba(255, 255, 255, 0.35), transparent);
+    opacity: 0.6;
+    pointer-events: none;
+    z-index: -1;
+  }
+  @media (hover: hover) {
+    .lg-button:hover {
+      filter: saturate(1.15) brightness(1.06);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.5),
+        inset 0 -2px 6px rgba(0, 0, 0, 0.2),
+        0 18px 42px -10px rgba(201, 63, 130, 0.55),
+        0 4px 10px rgba(0, 0, 0, 0.25);
+    }
+  }
+  .lg-button:active {
+    scale: 0.95;
+  }
+  .lg-button:disabled {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  /* Icon button (nav, toggles) */
+  .lg-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 40px;
+    border-radius: 9999px;
+    color: color-mix(in oklab, var(--color-cloud) 75%, transparent);
+    cursor: pointer;
+  }
+  .lg-icon-btn:hover {
+    color: var(--color-cloud);
+    background: var(--pill-inactive-hover);
+  }
+
+  /* UI helper classes for theme-aware borders & surfaces */
+  .border-glass-divider {
+    border-color: var(--glass-divider);
+  }
+  .bg-track {
+    background-color: var(--track-bg);
+  }
+  .bg-empty-cell {
+    background-color: var(--empty-cell);
+  }
+
+  /* Hide scrollbars on horizontal pill rails */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Heatmap / chart: dim siblings while one datum is focused */
+  .chart-dim [data-cell]:not([data-active='true']) {
+    opacity: 0.38;
+    filter: saturate(0.7);
+  }
+  [data-cell] {
+    transition: opacity 0.25s ease, filter 0.25s ease, scale 0.3s var(--ease-spring);
+  }
+
+  /* Scroll reveal for headings marked with data-reveal */
+  .reveal-ready [data-reveal] {
+    opacity: 0;
+    translate: 0 18px;
+    filter: blur(6px);
+    transition:
+      opacity 0.9s var(--ease-out-expo),
+      translate 0.9s var(--ease-out-expo),
+      filter 0.9s var(--ease-out-expo);
+  }
+  .reveal-ready [data-reveal].is-visible {
+    opacity: 1;
+    translate: 0 0;
+    filter: none;
+  }
+  .reveal-ready [data-reveal='2'] {
+    transition-delay: 0.08s;
+  }
 }
 
-.glass-button canvas {
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  width: 100% !important;
-  height: 100% !important;
-  z-index: 1 !important;
-  pointer-events: none !important;
-  border-radius: 9999px !important;
-  mix-blend-mode: screen !important;
+/* ==========================================================================
+   AMBIENT BACKGROUND (fixed, cheap: gradients only, no filter blur)
+   ========================================================================== */
+.ambient {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background: var(--canvas);
+  transition: background-color 0.5s ease;
+}
+.ambient__orb {
+  position: absolute;
+  width: 70vmax;
+  height: 70vmax;
+  border-radius: 50%;
+  will-change: transform;
+}
+.ambient__orb--1 {
+  top: -25vmax;
+  left: -20vmax;
+  background: radial-gradient(circle, var(--orb-1) 0%, transparent 62%);
+  transform: translate3d(0, calc(var(--scroll) * -18vh), 0);
+  animation: orb-drift-a 26s ease-in-out infinite alternate;
+}
+.ambient__orb--2 {
+  top: 20vh;
+  right: -30vmax;
+  background: radial-gradient(circle, var(--orb-2) 0%, transparent 62%);
+  transform: translate3d(0, calc(var(--scroll) * -32vh), 0);
+  animation: orb-drift-b 32s ease-in-out infinite alternate;
+}
+.ambient__orb--3 {
+  bottom: -35vmax;
+  left: 10vw;
+  background: radial-gradient(circle, var(--orb-3) 0%, transparent 62%);
+  transform: translate3d(0, calc(var(--scroll) * -12vh), 0);
+  animation: orb-drift-a 38s ease-in-out infinite alternate-reverse;
+}
+.ambient__grain {
+  position: absolute;
+  inset: 0;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@keyframes orb-drift-a {
+  from { translate: 0 0; }
+  to { translate: 8vw 6vh; }
+}
+@keyframes orb-drift-b {
+  from { translate: 0 0; }
+  to { translate: -10vw -4vh; }
 }
 
-.glass-button-text {
-  position: relative !important;
-  top: auto !important;
-  left: auto !important;
-  transform: none !important;
-  z-index: 2 !important;
-  color: #FFFFFF !important;
-  font-family: 'Manrope', sans-serif !important;
-  font-weight: 700 !important;
-  font-size: 15px !important;
-  letter-spacing: 0.01em !important;
-  pointer-events: none !important;
-  white-space: nowrap !important;
+/* SVG refraction (Chromium-only progressive enhancement, used on hero chips) */
+.supports-refraction .glass-refract {
+  -webkit-backdrop-filter: url(#lg-refract) blur(6px) saturate(180%);
+  backdrop-filter: url(#lg-refract) blur(6px) saturate(180%);
+}
+
+/* ==========================================================================
+   ACCESSIBILITY FALLBACKS
+   ========================================================================== */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .reveal-ready [data-reveal] {
+    opacity: 1;
+    translate: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass,
+  .glass-strong,
+  .glass-chip {
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    background: var(--color-navy) !important;
+  }
+}
+
+@media (prefers-contrast: more) {
+  .glass,
+  .glass-strong {
+    background: var(--color-night) !important;
+    border-color: var(--color-cloud) !important;
+  }
+}
+
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .glass,
+  .glass-strong {
+    background: var(--glass-strong-bg);
+  }
 }

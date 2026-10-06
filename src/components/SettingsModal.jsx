@@ -1,5 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import GlassButton from './GlassButton';
+
+const THEME_OPTIONS = [
+  { id: 'system', label: 'Auto' },
+  { id: 'light', label: 'Light' },
+  { id: 'dark', label: 'Dark' },
+];
 
 function SettingsModal({
   isOpen,
@@ -12,6 +18,7 @@ function SettingsModal({
   currentMapping,
   onSaveMapping,
   onResetChat,
+  theme,
 }) {
   const [herSender, setHerSender] = useState(
     () => currentMapping?.her || rawSenders?.[0] || 'Her'
@@ -19,6 +26,18 @@ function SettingsModal({
   const [himSender, setHimSender] = useState(
     () => currentMapping?.him || rawSenders?.[1] || 'Him'
   );
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    const onKey = (e) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
@@ -57,18 +76,23 @@ function SettingsModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-night/80 backdrop-blur-md animate-fade-in"
+      aria-labelledby="settings-title"
+      className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4 animate-fade-in"
+      style={{ background: 'var(--scrim)', WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)' }}
       onClick={onClose}
     >
       <div
-        className="w-full max-w-md glass border border-white/20 rounded-3xl p-6 sm:p-8 shadow-2xl relative select-none max-h-[90vh] overflow-y-auto scrollbar-thin"
+        className="w-full sm:max-w-md glass glass-strong rounded-t-[32px] sm:rounded-[32px] px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-8 relative select-none max-h-[88vh] overflow-y-auto no-scrollbar animate-sheet-up"
         onClick={(e) => e.stopPropagation()}
       >
+        {/* Sheet grabber (mobile) */}
+        <div className="sm:hidden mx-auto mb-4 h-1.5 w-10 rounded-full" style={{ backgroundColor: 'var(--modal-grabber)' }} aria-hidden="true" />
+
         {/* Close icon button */}
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 text-cloud/40 hover:text-cloud transition-colors p-1 rounded-full cursor-pointer"
+          className="lg-icon-btn absolute top-4 right-4 sm:top-5 sm:right-5"
           aria-label="Close settings"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -77,15 +101,49 @@ function SettingsModal({
         </button>
 
         {/* Header */}
-        <h3 className="font-serif text-xl sm:text-2xl text-cloud font-semibold mb-1">
-          Chat &amp; Platform Settings
+        <h3 id="settings-title" className="font-serif text-2xl text-cloud font-semibold mb-1 pr-10">
+          Settings
         </h3>
-        <p className="font-sans text-xs text-cloud/60 mb-5">
-          Manage your connected chat platforms and nicknames
+        <p className="font-sans text-xs text-cloud/60 mb-6">
+          Appearance, connected platforms and nicknames
         </p>
 
+        {/* Appearance */}
+        {theme && (
+          <div className="mb-4 p-4 rounded-2xl bg-track border border-glass-divider space-y-4">
+            <span className="block font-sans text-xs uppercase tracking-wider text-pink font-semibold">
+              Appearance
+            </span>
+            <div
+              role="radiogroup"
+              aria-label="Theme"
+              className="grid grid-cols-3 p-1 rounded-full bg-track border border-glass-divider"
+            >
+              {THEME_OPTIONS.map((opt) => {
+                const active = theme.preference === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => theme.setTheme(opt.id)}
+                    className={`min-h-9 rounded-full text-xs font-sans cursor-pointer ${
+                      active
+                        ? 'bg-pink text-on-pink font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]'
+                        : 'text-cloud/75 hover:text-cloud font-medium'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Connected Platforms List */}
-        <div className="mb-6 p-4 rounded-2xl bg-white/[0.03] border border-white/10 space-y-3">
+        <div className="mb-6 p-4 rounded-2xl bg-track border border-glass-divider space-y-3">
           <div className="flex items-center justify-between">
             <span className="font-sans text-xs uppercase tracking-wider text-pink font-semibold">
               Connected Platforms
@@ -112,15 +170,15 @@ function SettingsModal({
                 return (
                   <div
                     key={pKey}
-                    className="flex items-center justify-between p-2.5 rounded-xl bg-night/60 border border-white/5"
+                    className="flex items-center justify-between p-2.5 rounded-xl glass-chip"
                   >
                     <div className="flex items-center gap-2">
                       {pKey === 'instagram' ? (
-                        <span className="w-2.5 h-2.5 rounded-full bg-pink" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-ig-pink shrink-0" />
                       ) : pKey === 'telegram' ? (
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#2AABEE]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-tg-pink shrink-0" />
                       ) : (
-                        <span className="w-2.5 h-2.5 rounded-full bg-[#25D366]" />
+                        <span className="w-2.5 h-2.5 rounded-full bg-wa-pink shrink-0" />
                       )}
                       <span className="text-xs font-medium text-cloud capitalize">
                         {pKey === 'instagram' ? 'Instagram' : pKey === 'telegram' ? 'Telegram' : 'WhatsApp'}
@@ -159,7 +217,7 @@ function SettingsModal({
               <select
                 value={herSender}
                 onChange={(e) => handleHerChange(e.target.value)}
-                className="w-full bg-night/90 border border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
               >
                 {rawSenders.map((name) => (
                   <option key={name} value={name} className="bg-night text-cloud">
@@ -176,7 +234,7 @@ function SettingsModal({
               <select
                 value={himSender}
                 onChange={(e) => handleHimChange(e.target.value)}
-                className="w-full bg-night/90 border border-white/20 rounded-xl px-3.5 py-2.5 text-sm text-cloud focus:outline-none focus:border-pink transition-colors cursor-pointer"
+                className="w-full glass-field px-3.5 py-2.5 text-sm cursor-pointer"
               >
                 {rawSenders.map((name) => (
                   <option key={name} value={name} className="bg-night text-cloud">
@@ -194,7 +252,7 @@ function SettingsModal({
 
         {/* Action Buttons */}
         <div className="flex flex-col gap-3">
-          <GlassButton text="Save &amp; Update Story" onClick={handleSave} />
+          <GlassButton text="Save &amp; Update Story" onClick={handleSave} icon="sparkle" />
           <button
             type="button"
             onClick={() => {

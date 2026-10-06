@@ -53,13 +53,21 @@ function Hero({ messages, senders, herName, himName, rawSenders }) {
       }
     };
 
+    // Fallback: force looping if native `loop` doesn't restart playback
+    const restart = () => {
+      video.currentTime = 0;
+      playVideo();
+    };
+
     playVideo();
     video.addEventListener('loadeddata', playVideo);
     video.addEventListener('canplay', playVideo);
+    video.addEventListener('ended', restart);
 
     return () => {
       video.removeEventListener('loadeddata', playVideo);
       video.removeEventListener('canplay', playVideo);
+      video.removeEventListener('ended', restart);
     };
   }, [prefersReducedMotion]);
 
@@ -103,8 +111,8 @@ function Hero({ messages, senders, herName, himName, rawSenders }) {
           style={{ objectPosition: '82% center' }}
           className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none"
         >
-          <source src={heroWebm} type="video/webm" />
           <source src={heroMp4} type="video/mp4" />
+          <source src={heroWebm} type="video/webm" />
         </video>
       )}
 

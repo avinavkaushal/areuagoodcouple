@@ -11,6 +11,7 @@ import {
   detectPlatform,
   flattenTelegramText,
   fixMojibake,
+  isUnwantedMessageText,
 } from '../src/lib/parseChat.js';
 import { resolveSenderMapping } from '../src/lib/nicknameConfig.js';
 import {
@@ -32,6 +33,8 @@ import {
   getMilestoneStats,
   getLoveWordStats,
   getRandomMemory,
+  isEligibleMemoryCandidate,
+  isValidMemoryWindowMessage,
   getCalloutStats,
   getReelStats,
   getMediaBreakdownStats,
@@ -1193,5 +1196,248 @@ describe('Cross-Platform Unification Statistics (Phase 4)', () => {
     assert.equal(reelStats.totalReels, 0);
   });
 });
+
+describe('Instagram Unwanted Message Filtering and Roll a Memory Cleanliness', () => {
+  const unwantedPhrases = [
+    ' you sent an attachment ',
+    ' <name> sent an attachment ',
+    'You sent an attachment.',
+    'Avu sent an attachment.',
+    'Liked a message',
+    'liked a message',
+    'John liked a message',
+    'liked your story',
+    'reacted ❤️ to your message',
+    'Reacted 😂 to your message',
+    'Avu reacted 👍 to your message',
+    'reacted to your story',
+    'you change the theme to Tiny Flowers',
+    'you changed the theme to Love',
+    'Avu changed the theme to Cyberpunk',
+    '<name> started an audio call ',
+    'Avu started an audio call',
+    'You started an audio call.',
+    'audio call ended',
+    'Audio call ended.',
+    'The audio call ended.',
+    'Audio call ended · 15m',
+    'you missed an audio call',
+    'You missed an audio call.',
+    'Avu missed an audio call',
+    'Missed audio call',
+    'Avu started a video chat',
+    'The video chat ended.',
+    'You missed a video chat',
+    'Video call ended',
+    '<Media omitted>',
+    '<sticker omitted>',
+  ];
+
+  const genuineConversationalPhrases = [
+    'Hey sweetie, I love you so much!',
+    'Can you call me later?',
+    'I called you earlier but you were asleep',
+    'Did you see the theme of the party?',
+    'I sent an attachment to my boss earlier today',
+    'I liked the restaurant we went to yesterday',
+    'I reacted badly to that news',
+    'Good morning my love ❤️',
+  ];
+
+  test('isUnwantedMessageText correctly identifies unwanted noise and preserves genuine chat messages', () => {
+    for (const phrase of unwantedPhrases) {
+      assert.equal(
+        isUnwantedMessageText(phrase),
+        true,
+        `Expected "${phrase}" to be recognized as unwanted message text`
+      );
+    }
+
+    for (const phrase of genuineConversationalPhrases) {
+      assert.equal(
+        isUnwantedMessageText(phrase),
+        false,
+        `Expected genuine phrase "${phrase}" NOT to be flagged as unwanted`
+      );
+    }
+  });
+
+  test('parseInstagramJson classifies calls, theme changes, and reactions as system messages, and attachment placeholders as media', () => {
+    const rawIgChat = {
+      participants: [{ name: 'Aru' }, { name: 'Avu' }],
+      messages: [
+        {
+          sender_name: 'Aru',
+          timestamp_ms: 1729500000000,
+          content: 'You sent an attachment.', // Attachment placeholder without downloaded media
+        },
+        {
+          sender_name: 'Avu',
+          timestamp_ms: 1729500060000,
+          content: 'Liked a message', // Reaction message
+        },
+        {
+          sender_name: 'Aru',
+          timestamp_ms: 1729500120000,
+          content: 'Reacted ❤️ to your message',
+        },
+        {
+          sender_name: 'Avu',
+          timestamp_ms: 1729500180000,
+          content: 'Avu changed the theme to Love.',
+        },
+        {
+          sender_name: 'Avu',
+          timestamp_ms: 1729500240000,
+          content: 'Avu started an audio call.',
+        },
+        {
+          sender_name: 'Avu',
+          timestamp_ms: 1729500300000,
+          content: 'The audio call ended.',
+        },
+        {
+          sender_name: 'Aru',
+          timestamp_ms: 1729500360000,
+          content: 'You missed an audio call.',
+        },
+        {
+          sender_name: 'Aru',
+          timestamp_ms: 1729500420000,
+          content: 'Good night my love, sweet dreams ❤️', // Genuine text
+        },
+      ],
+    };
+
+    const parsed = parseInstagramJson(rawIgChat, { Aru: 'Her', Avu: 'Him' });
+    assert.equal(parsed.messages.length, 8);
+
+    // Attachment placeholder -> type 'media'
+    assert.equal(parsed.messages[0].type, 'media');
+    assert.equal(parsed.messages[0].text, 'You sent an attachment.');
+
+    // Reaction logs -> type 'system'
+    assert.equal(parsed.messages[1].type, 'system');
+    assert.equal(parsed.messages[2].type, 'system');
+
+    // Theme change -> type 'system'
+    assert.equal(parsed.messages[3].type, 'system');
+
+    // Audio call start, end, missed -> type 'system'
+    assert.equal(parsed.messages[4].type, 'system');
+    assert.equal(parsed.messages[5].type, 'system');
+    assert.equal(parsed.messages[6].type, 'system');
+
+    // Genuine conversational message -> type 'text'
+    assert.equal(parsed.messages[7].type, 'text');
+    assert.equal(parsed.messages[7].text, 'Good night my love, sweet dreams ❤️');
+
+    // getNonSystemMessages filters out all the system events
+    const nonSystem = getNonSystemMessages(parsed.messages);
+    assert.equal(nonSystem.length, 2); // only attachment (media) and good night (text)
+    assert.ok(nonSystem.every((m) => m.type !== 'system'));
+  });
+
+  test('getRandomMemory never selects unwanted messages as primary memory or window context', () => {
+    const mixedNoiseAndChat = [
+      { sender: 'Her', type: 'text', timestamp: new Date('2024-10-01T10:00:00'), text: 'You sent an attachment.' },
+      { sender: 'Him', type: 'text', timestamp: new Date('2024-10-01T10:01:00'), text: 'Liked a message' },
+      { sender: 'Her', type: 'text', timestamp: new Date('2024-10-01T10:02:00'), text: 'Reacted ❤️ to your message' },
+      { sender: 'Him', type: 'text', timestamp: new Date('2024-10-01T10:03:00'), text: 'you changed the theme to Tiny Flowers' },
+      { sender: 'Her', type: 'text', timestamp: new Date('2024-10-01T10:04:00'), text: 'Him started an audio call' },
+      { sender: 'Him', type: 'text', timestamp: new Date('2024-10-01T10:05:00'), text: 'audio call ended' },
+      { sender: 'Her', type: 'text', timestamp: new Date('2024-10-01T10:06:00'), text: 'you missed an audio call' },
+      {
+        sender: 'Him',
+        type: 'text',
+        timestamp: new Date('2024-10-01T10:07:00'),
+        text: 'I loved our anniversary dinner so much! You looked stunning.',
+      },
+    ];
+
+    // Candidate eligibility
+    for (let i = 0; i < 7; i++) {
+      assert.equal(
+        isEligibleMemoryCandidate(mixedNoiseAndChat[i]),
+        false,
+        `Message ${i} ("${mixedNoiseAndChat[i].text}") must NOT be eligible as memory`
+      );
+    }
+    assert.equal(isEligibleMemoryCandidate(mixedNoiseAndChat[7]), true);
+
+    // Roll memory should exclusively pick the genuine message
+    const mem = getRandomMemory(mixedNoiseAndChat);
+    assert.ok(mem);
+    assert.equal(mem.primarySender, 'Him');
+    assert.equal(mem.messages.length, 1);
+    assert.equal(mem.messages[0].text, 'I loved our anniversary dinner so much! You looked stunning.');
+
+    // All messages in window must be valid
+    assert.ok(mem.messages.every((m) => isValidMemoryWindowMessage(m)));
+  });
+
+  test('getRandomMemory skips intermediate unwanted noise in window to provide conversational context', () => {
+    const convoWithNoise = [
+      {
+        sender: 'Her',
+        type: 'text',
+        timestamp: new Date('2024-10-01T12:00:00'),
+        text: 'Are you excited for our road trip this weekend?',
+      },
+      {
+        sender: 'Him',
+        type: 'media',
+        timestamp: new Date('2024-10-01T12:01:00'),
+        text: 'You sent an attachment.',
+      },
+      {
+        sender: 'Him',
+        type: 'system',
+        timestamp: new Date('2024-10-01T12:02:00'),
+        text: 'The audio call ended.',
+      },
+      {
+        sender: 'Him',
+        type: 'text',
+        timestamp: new Date('2024-10-01T12:03:00'),
+        text: 'Beyond excited! I packed all the snacks and made the playlist.',
+      },
+      {
+        sender: 'Her',
+        type: 'text',
+        timestamp: new Date('2024-10-01T12:04:00'),
+        text: 'Liked a message',
+      },
+      {
+        sender: 'Her',
+        type: 'text',
+        timestamp: new Date('2024-10-01T12:05:00'),
+        text: 'Best travel partner ever ❤️',
+      },
+    ];
+
+    // Pick memory from this sequence (the only valid anchor candidates are msg 0, 3, 5)
+    for (let run = 0; run < 10; run++) {
+      const mem = getRandomMemory(convoWithNoise);
+      assert.ok(mem);
+      for (const m of mem.messages) {
+        assert.ok(
+          !isUnwantedMessageText(m.text),
+          `RandomMemory must not include unwanted message: "${m.text}"`
+        );
+      }
+    }
+  });
+
+  test('getRandomMemory returns null when chat export has only unwanted messages', () => {
+    const allNoise = [
+      { sender: 'Her', type: 'text', timestamp: new Date(), text: 'You sent an attachment.' },
+      { sender: 'Him', type: 'text', timestamp: new Date(), text: 'Liked a message' },
+      { sender: 'Her', type: 'text', timestamp: new Date(), text: 'audio call ended' },
+    ];
+    assert.equal(getRandomMemory(allNoise), null);
+  });
+});
+
 
 

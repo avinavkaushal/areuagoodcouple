@@ -30,13 +30,10 @@ import Outro from './components/Outro';
 import GlassButton from './components/GlassButton';
 import SettingsModal from './components/SettingsModal';
 import AmbientBackground from './components/AmbientBackground';
-import ThemeToggle from './components/ThemeToggle';
-import { useTheme } from './lib/theme';
 import { installInteractions } from './lib/interactions';
 import SectionErrorBoundary from './components/SectionErrorBoundary';
 
 function App() {
-  const theme = useTheme();
   const [messages, setMessages] = useState(null);
   const [senders, setSenders] = useState(null);
   const [rawSenders, setRawSenders] = useState(null);
@@ -553,24 +550,21 @@ function App() {
           muted
           loop
           playsInline
-          style={{ opacity: theme.resolved === 'light' ? 0.28 : 0.70 }}
-          className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none motion-reduce:hidden transition-opacity duration-500"
+          style={{ opacity: 0.70 }}
+          className="fixed inset-0 w-full h-full object-cover z-0 pointer-events-none motion-reduce:hidden"
         >
           <source src={bgWebm} type="video/webm" />
           <source src={bgMp4} type="video/mp4" />
         </video>
 
-        {/* Themed gradient overlay between video and card content for legibility */}
-        <div className="fixed inset-0 bg-gradient-to-b from-night/90 via-night/65 to-night/95 pointer-events-none z-0 transition-colors duration-500" />
+        {/* Gradient overlay between video and card content for legibility */}
+        <div className="fixed inset-0 bg-gradient-to-b from-night/90 via-night/65 to-night/95 pointer-events-none z-0" />
 
         {/* Top bar */}
         <header className="fixed top-0 inset-x-0 z-20 flex items-center justify-between px-5 sm:px-8 pt-[max(1rem,env(safe-area-inset-top))]">
           <span className="font-serif text-lg font-semibold tracking-tight text-cloud">
             areuagood<span className="text-pink">couple</span>
           </span>
-          <div className="glass glass-strong rounded-full p-1">
-            <ThemeToggle resolved={theme.resolved} onToggle={theme.toggle} />
-          </div>
         </header>
 
         <div className="w-full max-w-lg flex flex-col items-center relative z-10">
@@ -982,7 +976,7 @@ function App() {
     <div className="text-cloud relative min-h-screen pb-28 md:pb-12">
       <AmbientBackground />
 
-      <QuickNav messages={validMessages} onOpenSettings={() => setIsSettingsOpen(true)} theme={theme} />
+      <QuickNav messages={validMessages} onOpenSettings={() => setIsSettingsOpen(true)} />
 
       {/* Settings Modal */}
       <SettingsModal
@@ -996,7 +990,6 @@ function App() {
         currentMapping={{ her: currentHerSender, him: currentHimSender }}
         onSaveMapping={handleSaveSettingsMapping}
         onResetChat={handleResetChat}
-        theme={theme}
       />
 
       {/* Hidden file input for linking additional platforms */}
@@ -1124,7 +1117,6 @@ function App() {
           herName={currentHerSender}
           himName={currentHimSender}
           rawSenders={rawSenders}
-          theme={theme}
         />
       </SectionErrorBoundary>
       <SectionErrorBoundary name="CrossPlatformStats">

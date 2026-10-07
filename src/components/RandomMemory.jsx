@@ -7,9 +7,15 @@ import GlassButton from './GlassButton';
 gsap.registerPlugin(ScrollTrigger);
 
 function RandomMemory({ messages }) {
+  const [prevMessages, setPrevMessages] = useState(messages);
   const [memory, setMemory] = useState(() => getRandomMemory(messages));
   const cardRef = useRef(null);
   const sectionRef = useRef(null);
+
+  if (messages !== prevMessages) {
+    setPrevMessages(messages);
+    setMemory(getRandomMemory(messages));
+  }
 
   const pickMemory = useCallback(() => {
     const next = getRandomMemory(messages);

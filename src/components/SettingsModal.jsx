@@ -1,12 +1,6 @@
 import { useEffect, useState } from 'react';
 import GlassButton from './GlassButton';
 
-const THEME_OPTIONS = [
-  { id: 'system', label: 'Auto' },
-  { id: 'light', label: 'Light' },
-  { id: 'dark', label: 'Dark' },
-];
-
 function SettingsModal({
   isOpen,
   onClose,
@@ -18,7 +12,6 @@ function SettingsModal({
   currentMapping,
   onSaveMapping,
   onResetChat,
-  theme,
 }) {
   const [herSender, setHerSender] = useState(
     () => currentMapping?.her || rawSenders?.[0] || 'Her'
@@ -105,42 +98,8 @@ function SettingsModal({
           Settings
         </h3>
         <p className="font-sans text-xs text-cloud/60 mb-6">
-          Appearance, connected platforms and nicknames
+          Connected platforms and nicknames
         </p>
-
-        {/* Appearance */}
-        {theme && (
-          <div className="mb-4 p-4 rounded-2xl bg-track border border-glass-divider space-y-4">
-            <span className="block font-sans text-xs uppercase tracking-wider text-pink font-semibold">
-              Appearance
-            </span>
-            <div
-              role="radiogroup"
-              aria-label="Theme"
-              className="grid grid-cols-3 p-1 rounded-full bg-track border border-glass-divider"
-            >
-              {THEME_OPTIONS.map((opt) => {
-                const active = theme.preference === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => theme.setTheme(opt.id)}
-                    className={`min-h-9 rounded-full text-xs font-sans cursor-pointer ${
-                      active
-                        ? 'bg-pink text-on-pink font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.5)]'
-                        : 'text-cloud/75 hover:text-cloud font-medium'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* Connected Platforms List */}
         <div className="mb-6 p-4 rounded-2xl bg-track border border-glass-divider space-y-3">

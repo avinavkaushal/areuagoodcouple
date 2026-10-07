@@ -403,6 +403,94 @@ function isDeletedOrUnsent(m, decodedContent) {
   return false;
 }
 
+/**
+ * Detects unwanted system, call, attachment, or non-conversational event messages
+ * (e.g. "you sent an attachment", "Liked a message", "reacted ❤️ to your message",
+ * "you change the theme to <theme>", "started an audio call", "audio call ended", "you missed an audio call", etc.)
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isUnwantedMessageText(text) {
+  if (typeof text !== 'string') return true;
+  const t = text.trim();
+  if (!t) return true;
+
+  const clean = t.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+  if (!clean) return true;
+
+  // 1. Attachment notifications & omitted media placeholders
+  if (
+    /^(?:.*?\s+)?sent (?:an?\s+)?(?:attachment|photo|video|audio file|voice message|link|clip|post|story|reel)\.?$/i.test(clean) ||
+    /<(?:media|sticker|photo|video|audio|image|document)\s+omitted>/i.test(clean) ||
+    /^(?:omitted>|\(file attached\)|<attached:)/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 2. Liked a message / story / post / media
+  if (
+    /^(?:.*?\s+)?liked (?:a|an|your|their) (?:message|image|photo|video|reel|story|post)\.?$/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 3. Reacted to message or story
+  if (
+    /^(?:.*?\s+)?reacted(?:\s+.*?)?\s+to (?:your|their|this|a|an) (?:message|story|post|photo|video)\.?$/i.test(clean) ||
+    /^(?:replied to (?:their|your) story|reacted to (?:their|your) story)\.?$/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 4. Theme changes
+  if (
+    /^(?:.*?\s+)?change[sd]? the (?:chat )?theme to\b.*$/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 5. Calls started (audio or video)
+  if (
+    /^(?:.*?\s+)?started (?:an?\s+)?(?:audio|video|voice)?\s*(?:call|chat)\.?$/i.test(clean) ||
+    /^(?:audio|video|voice)?\s*(?:call|chat) started\.?$/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 6. Calls ended (audio or video)
+  if (
+    /^(?:the\s+)?(?:audio|video|voice)?\s*(?:call|chat) ended(?:\b.*)?$/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 7. Missed calls (audio or video)
+  if (
+    /^(?:.*?\s+)?missed (?:an?\s+)?(?:audio|video|voice)?\s*(?:call|chat)\.?$/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 8. Other system events (disappearing messages, polls, group names, pins, unsent)
+  if (
+    /(?:turned on|turned off|set) disappearing messages/i.test(clean) ||
+    /^(?:.*?\s+)?(?:named the group|changed the group name|changed the group photo)\b.*$/i.test(clean) ||
+    /^(?:.*?\s+)?(?:created a poll|voted in a poll)\b.*$/i.test(clean) ||
+    /^(?:.*?\s+)?(?:pinned a message|unpinned a message)\.?$/i.test(clean) ||
+    /^(?:you unsent a message|unsent a message|this message was unsent)$/i.test(clean) ||
+    /end-to-end encrypted/i.test(clean)
+  ) {
+    return true;
+  }
+
+  // 9. Plain URL alone
+  if (/^https?:\/\/\S+$/i.test(clean)) {
+    return true;
+  }
+
+  return false;
+}
+
 function deriveInstagramMessageType(m, decodedContent) {
   const shareLink = (m.share?.link || '').toLowerCase();
   const text = (decodedContent || '').trim();
@@ -431,6 +519,18 @@ function deriveInstagramMessageType(m, decodedContent) {
   // 5. Fallback media
   if ((Array.isArray(m.audio_files) && m.audio_files.length > 0) || shareLink) {
     return 'media';
+  }
+
+  // 6. Attachment placeholder without media files downloaded (e.g. "You sent an attachment.")
+  if (
+    /^(?:.*?\s+)?sent (?:an?\s+)?(?:attachment|photo|video|audio file|voice message|link|clip|post|story|reel)\.?$/i.test(text)
+  ) {
+    return 'media';
+  }
+
+  // 7. System / call / theme / reaction log events
+  if (m.type === 'Call' || m.call_duration != null || isUnwantedMessageText(text)) {
+    return 'system';
   }
 
   return 'text';

@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useMemo, useLayoutEffect } from 'react';
-import ThemeToggle from './ThemeToggle';
 
 const NAV_ITEMS = [
   { id: 'unified', label: 'Unified', icon: '🌐' },
@@ -21,7 +20,7 @@ const NAV_ITEMS = [
   { id: 'longest-message', label: 'Longest', icon: '📜' },
 ];
 
-function QuickNav({ messages, onOpenSettings, theme }) {
+function QuickNav({ messages, onOpenSettings }) {
   const [activeId, setActiveId] = useState('milestones');
   const [compact, setCompact] = useState(false);
   const [lens, setLens] = useState({ left: 0, width: 0, ready: false });
@@ -231,8 +230,6 @@ function QuickNav({ messages, onOpenSettings, theme }) {
           </div>
 
           <div className="w-px h-5 bg-[var(--glass-divider)] shrink-0 mx-0.5" aria-hidden="true" />
-
-          {theme && <ThemeToggle resolved={theme.resolved} onToggle={theme.toggle} className="shrink-0" />}
 
           {/* Settings */}
           {onOpenSettings && (

@@ -1,3 +1,7 @@
+import { isUnwantedMessageText } from './parseChat.js';
+
+export { isUnwantedMessageText };
+
 const EMOJI_RE = /(\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)/gu;
 
 export function formatDuration(firstDate, lastDate) {
@@ -248,7 +252,13 @@ const STOPWORDS = new Set([
   'voice','deleted','message','tum','tu','have','rhi','hum','get','we','nahi','aur','nhi',
   'mein','don','can','tho','will','mujhe','tumhe','waha','kuch','kya','hogi','kar','liye',
   'hun','rha','meh','yeh','mei','woh','are','what','why','how','meri','teri','mera', "http", 
-  "link","https", 'sent', 'attachment', 'reacted', 'link', 
+  "link","https", 'sent', 'attachment', 'reacted', 'link', 'audio', "started", "ended",
+  "chat", 'liked', 'reply', 'forwarded', "video", "mere", "then", "mereko", 'meko', 'mujhe', 'us', 'ko', 'aur',
+  'bhaiya', 'bhau', 'phone', 'saying', 'say', 'haan', 'ha', 'hnn', 'haa', 'haaa', 'ohh', 'oho', 'omg', 
+  'okay', 'okk', 'ok', 'oke', 'okkk', 'haa','okie', 'ohk', 'ohkay', 'ohkkay', 'ohkk', 'hmm', 'hmmm', 
+  'acha', 'accha', 'acha', 'achha', 'accha', 'good', 'hehe', 'haha', 'hahaa', 'hehehe', 'hahaha', 'hahahahaha',
+  'she', 'he', 'mrs', 'mr', 'hahahahaha', 'hahahhahah', 'hahahahah', 
+  
 ]);
 
 export function getWordCloudData(messages, topN = 40) {
@@ -256,6 +266,7 @@ export function getWordCloudData(messages, topN = 40) {
   const validMessages = messages || [];
 
   validMessages.forEach((m) => {
+    if (m && isUnwantedMessageText(m.text)) return;
     const words = (m.text || '').toLowerCase().match(/[a-z\p{sc=Devanagari}]+/gu) || [];
     words.forEach((w) => {
       if (w.length < 3 || STOPWORDS.has(w)) return;
@@ -274,7 +285,14 @@ export function isMediaMessage(m) {
     m.type === 'photo' ||
     m.type === 'video' ||
     m.type === 'reel_share' ||
-    Boolean(m.text && (m.text.includes('<Media omitted>') || m.text.includes('omitted>')))
+    Boolean(
+      m.text &&
+        (m.text.includes('<Media omitted>') ||
+          m.text.includes('omitted>') ||
+          /^(?:.*?\s+)?sent (?:an?\s+)?(?:attachment|photo|video|audio file|voice message|link|clip|post|story|reel)\.?$/i.test(
+            m.text.trim()
+          ))
+    )
   );
 }
 
@@ -382,7 +400,7 @@ export function getInitiatorStats(messages, senders) {
 
 export function getLongestMessage(messages, senders) {
   const defaultSender = senders && senders[0] ? senders[0] : 'unknown';
-  const validMessages = (messages || []).filter((m) => !isMediaMessage(m));
+  const validMessages = (messages || []).filter((m) => !isMediaMessage(m) && !isUnwantedMessageText(m.text));
   if (validMessages.length === 0) {
     return { text: '', wordCount: 0, sender: defaultSender, date: new Date() };
   }
@@ -449,7 +467,7 @@ export function getVerbosityStats(messages, senders) {
   let msgs1 = 0;
   let words2 = 0;
   let msgs2 = 0;
-  const validMessages = (messages || []).filter((m) => !isMediaMessage(m));
+  const validMessages = (messages || []).filter((m) => !isMediaMessage(m) && !isUnwantedMessageText(m.text));
 
   validMessages.forEach((m) => {
     const words = (m.text || '').trim().split(/\s+/).filter(Boolean).length;
@@ -694,6 +712,26 @@ export function getLoveWordStats(messages, senders) {
   };
 }
 
+export function isEligibleMemoryCandidate(m) {
+  if (!m || typeof m !== 'object') return false;
+  if (m.type && m.type !== 'text') return false;
+  if (isMediaMessage(m)) return false;
+  const t = (m.text || m.content || '').trim();
+  if (t.length <= 5) return false;
+  if (isUnwantedMessageText(t)) return false;
+  return true;
+}
+
+export function isValidMemoryWindowMessage(m) {
+  if (!m || typeof m !== 'object') return false;
+  if (m.type && m.type !== 'text') return false;
+  if (isMediaMessage(m)) return false;
+  const t = (m.text || m.content || '').trim();
+  if (!t) return false;
+  if (isUnwantedMessageText(t)) return false;
+  return true;
+}
+
 // 4. Random Memory Picker
 export function getRandomMemory(messages) {
   const validMessages = messages || [];
@@ -702,9 +740,7 @@ export function getRandomMemory(messages) {
   const candidates = [];
   for (let i = 0; i < validMessages.length; i++) {
     const m = validMessages[i];
-    const t = (m.text || '').trim();
-    const isMedia = m.type === 'media' || m.type === 'sticker' || t.includes('<Media omitted>') || t.includes('omitted>');
-    if (t.length > 5 && !isMedia) {
+    if (isEligibleMemoryCandidate(m)) {
       candidates.push(i);
     }
   }
@@ -716,20 +752,32 @@ export function getRandomMemory(messages) {
   const primaryDate = getMsgDate(primaryMsg);
 
   const windowMsgs = [primaryMsg];
-  if (randIdx > 0) {
-    const prev = validMessages[randIdx - 1];
+
+  // Scan backwards for the closest valid conversational message within 15 minutes
+  for (let step = 1; step <= 3 && randIdx - step >= 0; step++) {
+    const prev = validMessages[randIdx - step];
     const prevDate = getMsgDate(prev);
-    const prevIsMedia = prev.type === 'media' || prev.type === 'sticker' || (prev.text && prev.text.includes('omitted>'));
-    if (!prevIsMedia && Math.abs(primaryDate.getTime() - prevDate.getTime()) < 15 * 60 * 1000) {
+    if (Math.abs(primaryDate.getTime() - prevDate.getTime()) >= 15 * 60 * 1000) {
+      break;
+    }
+    if (isValidMemoryWindowMessage(prev)) {
       windowMsgs.unshift(prev);
+      break;
     }
   }
-  if (randIdx < validMessages.length - 1 && windowMsgs.length < 3) {
-    const next = validMessages[randIdx + 1];
-    const nextDate = getMsgDate(next);
-    const nextIsMedia = next.type === 'media' || next.type === 'sticker' || (next.text && next.text.includes('omitted>'));
-    if (!nextIsMedia && Math.abs(nextDate.getTime() - primaryDate.getTime()) < 15 * 60 * 1000) {
-      windowMsgs.push(next);
+
+  // Scan forwards for the closest valid conversational message within 15 minutes
+  if (windowMsgs.length < 3) {
+    for (let step = 1; step <= 3 && randIdx + step < validMessages.length; step++) {
+      const next = validMessages[randIdx + step];
+      const nextDate = getMsgDate(next);
+      if (Math.abs(nextDate.getTime() - primaryDate.getTime()) >= 15 * 60 * 1000) {
+        break;
+      }
+      if (isValidMemoryWindowMessage(next)) {
+        windowMsgs.push(next);
+        break;
+      }
     }
   }
 

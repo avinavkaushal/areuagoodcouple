@@ -17,11 +17,10 @@ function splitName(name) {
   };
 }
 
-function Hero({ messages, senders, herName, himName, rawSenders, theme }) {
+function Hero({ messages, senders, herName, himName, rawSenders }) {
   const lettersRef = useRef(null);
   const subRef = useRef(null);
   const videoRef = useRef(null);
-  const isLight = theme ? theme.resolved === 'light' : false;
 
   const [prefersReducedMotion, setPrefersReducedMotion] = useState(() => {
     if (typeof window !== 'undefined' && window.matchMedia) {
@@ -114,8 +113,8 @@ function Hero({ messages, senders, herName, himName, rawSenders, theme }) {
           src={heroPoster}
           alt=""
           aria-hidden="true"
-          style={{ objectPosition: '82% center', opacity: isLight ? 0.35 : 0.85 }}
-          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none transition-opacity duration-500"
+          style={{ objectPosition: '82% center', opacity: 0.85 }}
+          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none"
         />
       ) : (
         <video
@@ -126,22 +125,18 @@ function Hero({ messages, senders, herName, himName, rawSenders, theme }) {
           playsInline
           poster={heroPoster}
           preload="auto"
-          style={{ objectPosition: '82% center', opacity: isLight ? 0.35 : 0.85 }}
-          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none transition-opacity duration-500"
+          style={{ objectPosition: '82% center', opacity: 0.85 }}
+          className="absolute inset-0 w-full h-full object-cover object-right z-0 pointer-events-none"
         >
           <source src={heroMp4} type="video/mp4" />
           <source src={heroWebm} type="video/webm" />
         </video>
       )}
 
-      {/* Themed ink scrim for seamless transition into the canvas */}
+      {/* Ink scrim for seamless transition into the canvas */}
       <div
         aria-hidden="true"
-        className={`absolute inset-0 pointer-events-none z-[1] transition-all duration-500 ${
-          isLight
-            ? 'bg-gradient-to-r from-night/95 via-night/85 to-night/45'
-            : 'bg-gradient-to-r from-night/95 via-night/65 to-transparent'
-        }`}
+        className="absolute inset-0 pointer-events-none z-[1] bg-gradient-to-r from-night/95 via-night/65 to-transparent"
       />
       <div
         aria-hidden="true"

@@ -2,8 +2,6 @@
 
 /* ==========================================================================
    DESIGN TOKENS
-   Palette is theme-aware: utilities like `text-cloud` / `bg-night` resolve to
-   CSS variables that are re-declared per theme ([data-theme="light"|"dark"]).
    `cloud` = primary foreground, `night`/`midnight`/`navy` = canvas surfaces.
    ========================================================================== */
 @theme {
@@ -48,9 +46,8 @@
   to { opacity: 1; transform: none; }
 }
 
-/* ---------- Theme surfaces & glass material variables ---------- */
-:root,
-[data-theme='dark'] {
+/* ---------- Surfaces & glass material variables ---------- */
+:root {
   --color-midnight: #000412;
   --color-night: #00081F;
   --color-navy: #03113D;
@@ -61,7 +58,7 @@
   --color-deeppink: #C93F82;
   --color-on-pink: #00081F;
 
-  /* Platform-specific pink nuances (Dark Mode) */
+  /* Platform-specific pink nuances */
   --color-wa-pink: #FF7597;  /* WhatsApp: warm coral-rose pink */
   --color-tg-pink: #F4A5D8;  /* Telegram: soft ethereal orchid pink */
   --color-ig-pink: #DE3B94;  /* Instagram: sunset fuchsia magenta */
@@ -84,7 +81,7 @@
   --scrim: rgba(0, 4, 18, 0.62);
   --field-bg: rgba(0, 8, 31, 0.6);
 
-  /* Semantic surface & UI tokens (Dark Mode) */
+  /* Semantic surface & UI tokens */
   --glass-divider: rgba(255, 255, 255, 0.10);
   --track-bg: rgba(255, 255, 255, 0.06);
   --empty-cell: rgba(255, 255, 255, 0.08);
@@ -95,70 +92,15 @@
   --pill-inactive-hover: rgba(255, 255, 255, 0.10);
   --modal-grabber: rgba(255, 255, 255, 0.25);
 
-  /* Retro pixel button (Dark Mode) */
+  /* Retro pixel button */
   --px-border: #F2F4FA;
   --px-shadow: #C93F82;
 
-  color-scheme: dark;
-}
-
-[data-theme='light'] {
-  --color-midnight: #DCE3F3;
-  --color-night: #EEF2FA;
-  --color-navy: #E4EAF7;
-  --color-cloud: #0A1433;
-  --color-white: #FFFFFF;    /* True white restored for crisp highlights & icons */
-  --color-pink: #D23A80;     /* Calibrated accessible vibrant rose */
-  --color-blush: #7B3F9E;    /* Calibrated rich warm orchid/plum for distinct P1 vs P2 */
-  --color-deeppink: #B02A6B;
-  --color-on-pink: #FFFFFF;
-
-  /* Platform-specific pink nuances (Light Mode - WCAG AA compliant > 4.8:1) */
-  --color-wa-pink: #D82B61;  /* WhatsApp: rich coral-rose */
-  --color-tg-pink: #9E3782;  /* Telegram: deep vibrant orchid magenta */
-  --color-ig-pink: #B51774;  /* Instagram: deep sunset raspberry */
-
-  --canvas: #EEF2FA;
-  --orb-1: rgba(255, 133, 187, 0.28);
-  --orb-2: rgba(76, 125, 255, 0.20);
-  --orb-3: rgba(160, 120, 255, 0.18);
-
-  /* Light Liquid Glass Material */
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-hi: rgba(255, 255, 255, 0.92);
-  --glass-lo: rgba(242, 246, 254, 0.52);
-  --glass-border: rgba(10, 20, 51, 0.08);
-  --glass-rim: rgba(255, 255, 255, 0.95);
-  --glass-rim-accent: rgba(210, 58, 128, 0.35);
-  --glass-specular: rgba(255, 255, 255, 0.98);
-  --glass-shade: rgba(10, 20, 51, 0.04);
-  --glass-shadow: rgba(24, 38, 77, 0.10);
-  --glass-strong-bg: rgba(255, 255, 255, 0.85);
-  --scrim: rgba(220, 227, 243, 0.65);
-  --field-bg: rgba(255, 255, 255, 0.85);
-
-  /* Semantic surface & UI tokens (Light Mode) */
-  --glass-divider: rgba(10, 20, 51, 0.08);
-  --track-bg: rgba(10, 20, 51, 0.06);
-  --empty-cell: rgba(10, 20, 51, 0.07);
-  --chip-bg: rgba(255, 255, 255, 0.72);
-  --chip-border: rgba(10, 20, 51, 0.08);
-  --field-border: rgba(10, 20, 51, 0.14);
-  --nav-shadow: 0 12px 32px -6px rgba(20, 35, 75, 0.14), 0 2px 8px -2px rgba(20, 35, 75, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.95);
-  --pill-inactive-hover: rgba(10, 20, 51, 0.06);
-  --modal-grabber: rgba(10, 20, 51, 0.20);
-
-  /* Retro pixel button (Light Mode) */
-  --px-border: #0A1433;
-  --px-shadow: #0A1433;
-
-  color-scheme: light;
-}
-
-:root {
   --glass-blur: 14px;
   --glass-saturate: 170%;
   --scroll: 0;
+
+  color-scheme: dark;
 }
 
 @media (min-width: 768px) {
@@ -205,7 +147,6 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    transition: background-color 0.5s ease, color 0.5s ease;
   }
 
   body {
@@ -266,8 +207,7 @@
     transition:
       transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
       box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-      border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-      background-color 0.4s ease;
+      border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   /* Specular rim: a gradient hairline that catches "light" on the top-left edge */
@@ -455,7 +395,7 @@
     background: var(--pill-inactive-hover);
   }
 
-  /* UI helper classes for theme-aware borders & surfaces */
+  /* UI helper classes for borders & surfaces */
   .border-glass-divider {
     border-color: var(--glass-divider);
   }
@@ -514,7 +454,6 @@
   pointer-events: none;
   overflow: hidden;
   background: var(--canvas);
-  transition: background-color 0.5s ease;
 }
 .ambient__orb {
   position: absolute;

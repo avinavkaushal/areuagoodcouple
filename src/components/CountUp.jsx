@@ -1,26 +1,40 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 function easeOutExpo(t) {
   return t >= 1 ? 1 : 1 - Math.pow(2, -10 * t);
 }
 
+function formatValue(val, places, format) {
+  if (format) return format(val);
+  return val.toLocaleString(undefined, {
+    minimumFractionDigits: places,
+    maximumFractionDigits: places,
+  });
+}
+
 /**
- * Counts up from 0 to `value` the first time it scrolls into view.
- * Renders the final value immediately under reduced motion or for non-numbers.
+ * Counts up smoothly from 0 to `value` the first time it scrolls into view.
+ * Uses direct DOM text updates during rAF to eliminate 60-120 React re-renders/sec.
  */
-function CountUp({ value, duration = 1400, decimals, className = '', format }) {
+function CountUp({ value, duration = 1200, decimals, className = '', format }) {
   const ref = useRef(null);
   const numeric = typeof value === 'number' && Number.isFinite(value);
   const places = decimals ?? (numeric && !Number.isInteger(value) ? 1 : 0);
-  const [display, setDisplay] = useState(numeric ? 0 : value);
   const startedRef = useRef(false);
 
   useEffect(() => {
     if (!numeric) return undefined;
     const el = ref.current;
+    if (!el) return undefined;
+
     const reduce = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    if (!el || reduce || !('IntersectionObserver' in window)) {
-      setDisplay(value);
+    if (reduce || !('IntersectionObserver' in window)) {
+      el.textContent = formatValue(value, places, format);
+      return undefined;
+    }
+
+    if (startedRef.current) {
+      el.textContent = formatValue(value, places, format);
       return undefined;
     }
 
@@ -29,16 +43,18 @@ function CountUp({ value, duration = 1400, decimals, className = '', format }) {
       const start = performance.now();
       const tick = (now) => {
         const t = Math.min(1, (now - start) / duration);
-        setDisplay(value * easeOutExpo(t));
-        if (t < 1) raf = requestAnimationFrame(tick);
+        const cur = value * easeOutExpo(t);
+        if (ref.current) {
+          ref.current.textContent = formatValue(cur, places, format);
+        }
+        if (t < 1) {
+          raf = requestAnimationFrame(tick);
+        } else if (ref.current) {
+          ref.current.textContent = formatValue(value, places, format);
+        }
       };
       raf = requestAnimationFrame(tick);
     };
-
-    if (startedRef.current) {
-      setDisplay(value);
-      return undefined;
-    }
 
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -48,26 +64,21 @@ function CountUp({ value, duration = 1400, decimals, className = '', format }) {
           run();
         }
       },
-      { threshold: 0.4 }
+      { threshold: 0.25 }
     );
     io.observe(el);
+
     return () => {
       io.disconnect();
       if (raf) cancelAnimationFrame(raf);
     };
-  }, [value, duration, numeric]);
+  }, [value, duration, numeric, places, format]);
 
-  let text = display;
-  if (numeric) {
-    const n = Number(display);
-    text = format
-      ? format(n)
-      : n.toLocaleString(undefined, { minimumFractionDigits: places, maximumFractionDigits: places });
-  }
+  const initialText = numeric ? formatValue(0, places, format) : value;
 
   return (
     <span ref={ref} className={`tabular-nums ${className}`}>
-      {text}
+      {initialText}
     </span>
   );
 }

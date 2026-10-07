@@ -98,8 +98,8 @@ function QuickNav({ messages, onOpenSettings, theme }) {
           ticking = false;
           const y = window.scrollY;
           const delta = y - lastY;
-          if (Math.abs(delta) > 8) {
-            setCompact(delta > 0 && y > 240);
+          if (Math.abs(delta) > 20) {
+            setCompact(delta > 0 && y > 280);
             lastY = y;
           }
 
@@ -170,7 +170,7 @@ function QuickNav({ messages, onOpenSettings, theme }) {
             onClick={() => setIsMenuOpen(true)}
             title="All story sections"
             aria-label="Open sections grid"
-            className="md:hidden lg-icon-btn shrink-0 text-pink hover:text-blush pl-1 pr-1.5"
+            className="md:hidden lg-icon-btn shrink-0 text-pink hover:text-blush pl-1 pr-1.5 active:!scale-95"
           >
             <svg
               className="w-4 h-4"
@@ -207,7 +207,7 @@ function QuickNav({ messages, onOpenSettings, theme }) {
                 boxShadow:
                   'inset 0 1px 0 rgba(255,255,255,0.55), inset 0 -1px 2px rgba(0,0,0,0.15), 0 4px 14px -4px color-mix(in oklab, var(--color-pink) 70%, transparent)',
                 transition: lens.ready
-                  ? 'transform 0.34s cubic-bezier(0.22, 1, 0.36, 1), width 0.34s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease'
+                  ? 'transform 0.36s cubic-bezier(0.16, 1, 0.3, 1), width 0.36s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease'
                   : 'opacity 0.2s ease',
               }}
             />
@@ -220,7 +220,7 @@ function QuickNav({ messages, onOpenSettings, theme }) {
                   type="button"
                   onClick={() => scrollTo(id)}
                   aria-current={isActive ? 'true' : undefined}
-                  className={`relative z-10 px-3 sm:px-3.5 min-h-9 rounded-full text-[13px] sm:text-xs font-sans whitespace-nowrap cursor-pointer shrink-0 transition-colors duration-200 ${
+                  className={`relative z-10 px-3 sm:px-3.5 min-h-9 rounded-full text-[13px] sm:text-xs font-sans whitespace-nowrap cursor-pointer shrink-0 transition-colors duration-200 active:!scale-100 !transform-none ${
                     isActive ? 'text-on-pink font-semibold' : 'text-cloud/75 hover:text-cloud font-medium'
                   }`}
                 >

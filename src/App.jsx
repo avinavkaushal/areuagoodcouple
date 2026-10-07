@@ -713,7 +713,7 @@ function App() {
                     </div>
 
                     <div className="w-full flex flex-col items-center gap-3">
-                      <GlassButton text="Confirm &amp; Unify Chats ✨" onClick={handleConfirmPending} icon="sparkle" />
+                      <GlassButton text="Confirm &amp; Unify Chats" onClick={handleConfirmPending} icon="sparkle" />
                       <button
                         type="button"
                         onClick={handleResetChat}
@@ -814,7 +814,7 @@ function App() {
 
                     {/* Primary Action Button */}
                     <div className="w-full flex flex-col items-center gap-3">
-                      <GlassButton text="Confirm &amp; Explore ✨" onClick={handleConfirmPending} icon="sparkle" />
+                      <GlassButton text="Confirm &amp; Explore" onClick={handleConfirmPending} icon="sparkle" />
 
                       <button
                         type="button"
@@ -1104,7 +1104,7 @@ function App() {
             </div>
 
             <div className="flex flex-col gap-3">
-              <GlassButton text="Link &amp; Merge Platform ✨" onClick={handleConfirmAdditionalPlatform} icon="sparkle" />
+              <GlassButton text="Link &amp; Merge Platform" onClick={handleConfirmAdditionalPlatform} icon="sparkle" />
               <button
                 type="button"
                 onClick={() => setPendingAdditionalChat(null)}

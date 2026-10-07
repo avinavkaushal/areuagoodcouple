@@ -17,11 +17,11 @@ function Outro({ messages, senders }) {
     const ctx = gsap.context(() => {
       gsap.from(cardRef.current, {
         opacity: 0,
-        y: 24,
-        scale: 0.96,
-        duration: 1,
+        y: 20,
+        duration: 0.75,
         ease: 'power3.out',
-        scrollTrigger: { trigger: sectionRef.current, start: 'top 75%', once: true },
+        clearProps: 'transform,opacity',
+        scrollTrigger: { trigger: sectionRef.current, start: 'top 82%', once: true },
       });
     }, sectionRef);
 

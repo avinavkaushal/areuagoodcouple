@@ -151,7 +151,7 @@ function ActivityHeatmap({ messages }) {
         <div className={`glass rounded-3xl p-6 sm:p-8 select-none ${hovered ? 'chart-dim' : ''}`}>
           {viewMode === 'period' ? (
             /* ------------------ 4 PERIODS VIEW (Mobile-friendly, Zero Horizontal Scroll) ------------------ */
-            <div className="w-full">
+            <div key="period" className="w-full animate-fade-in">
               {/* Period Column Headers */}
               <div className="grid grid-cols-[40px_repeat(4,1fr)] gap-2 sm:gap-3 mb-2.5 text-center">
                 <div />
@@ -212,7 +212,7 @@ function ActivityHeatmap({ messages }) {
             </div>
           ) : (
             /* ------------------ 24 HOURS VIEW (Clean Minimal Punchcard) ------------------ */
-            <div className="overflow-x-auto no-scrollbar pb-1">
+            <div key="hourly" className="overflow-x-auto no-scrollbar pb-1 animate-fade-in">
               <div className="min-w-[540px]">
                 {/* 24 Hour Tick Markers */}
                 <div className="grid grid-cols-[36px_repeat(24,1fr)] gap-1 mb-2 text-[10px] font-mono text-cloud/40 text-center">

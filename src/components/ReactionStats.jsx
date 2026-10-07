@@ -13,14 +13,15 @@ function ReactionStats({ messages, senders }) {
   useEffect(() => {
     const ctx = gsap.context(() => {
       gsap.from('.reaction-card', {
-        y: 28,
+        y: 20,
         opacity: 0,
-        duration: 0.8,
-        stagger: 0.1,
-        ease: 'power2.out',
+        duration: 0.65,
+        stagger: 0.08,
+        ease: 'power3.out',
+        clearProps: 'transform,opacity',
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: 'top 75%',
+          start: 'top 82%',
           once: true,
         },
       });

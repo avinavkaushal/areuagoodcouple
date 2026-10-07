@@ -118,7 +118,7 @@ function CalendarHeat({ messages }) {
                       onMouseLeave={() => setHoveredDay(null)}
                       onClick={() => setHoveredDay({ dateStr, count: item.count })}
                       style={{ opacity }}
-                      className={`w-3.5 h-3.5 rounded-[3px] transition-all hover:scale-150 hover:z-20 cursor-pointer ${
+                      className={`w-3.5 h-3.5 rounded-[3px] transition-[transform,opacity,filter] duration-150 hover:scale-150 hover:z-20 cursor-pointer ${
                         isZero ? 'bg-empty-cell hover:opacity-100' : `${activeSquareColor} hover:brightness-110 hover:shadow-sm`
                       }`}
                     />

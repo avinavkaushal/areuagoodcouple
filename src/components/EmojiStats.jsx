@@ -41,7 +41,7 @@ function EmojiStats({ messages, senders }) {
                     {r.left || ''}
                   </span>
                   <div
-                    className="h-3.5 bg-pink rounded-l-full transition-all duration-500 dark:shadow-[0_0_8px_rgba(255,133,187,0.3)]"
+                    className="h-3.5 bg-pink rounded-l-full transition-[width] duration-500 ease-out dark:shadow-[0_0_8px_rgba(255,133,187,0.3)]"
                     style={{ width: `${(r.left / maxVal) * 100}%`, minWidth: r.left ? '4px' : 0 }}
                   />
                 </div>
@@ -52,7 +52,7 @@ function EmojiStats({ messages, senders }) {
 
                 <div className="flex-1 flex items-center gap-2.5">
                   <div
-                    className="h-3.5 bg-blush rounded-r-full transition-all duration-500 dark:shadow-[0_0_8px_rgba(255,206,227,0.3)]"
+                    className="h-3.5 bg-blush rounded-r-full transition-[width] duration-500 ease-out dark:shadow-[0_0_8px_rgba(255,206,227,0.3)]"
                     style={{ width: `${(r.right / maxVal) * 100}%`, minWidth: r.right ? '4px' : 0 }}
                   />
                   <span className="font-mono text-cloud/50 text-xs w-8 tabular-nums">

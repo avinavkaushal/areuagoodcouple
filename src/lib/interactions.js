@@ -12,12 +12,18 @@ function prefersReducedMotion() {
 }
 
 function setupScrollProgress() {
-  const root = document.documentElement;
   let frame = 0;
+  let ambientEl = null;
+
   const update = () => {
     frame = 0;
-    const max = Math.max(1, root.scrollHeight - window.innerHeight);
-    root.style.setProperty('--scroll', (window.scrollY / max).toFixed(4));
+    if (!ambientEl) {
+      ambientEl = document.querySelector('.ambient');
+    }
+    if (!ambientEl) return;
+    const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
+    const progress = (window.scrollY / max).toFixed(4);
+    ambientEl.style.setProperty('--scroll', progress);
   };
   const onScroll = () => {
     if (!frame) frame = requestAnimationFrame(update);
@@ -45,7 +51,7 @@ function setupReveal() {
         }
       }
     },
-    { rootMargin: '0px 0px -12% 0px', threshold: 0.05 }
+    { rootMargin: '0px 0px -8% 0px', threshold: 0.05 }
   );
 
   const observeAll = (scope) => {

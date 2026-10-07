@@ -92,13 +92,14 @@ function Hero({ messages, senders, herName, himName, rawSenders, theme }) {
       if (!letters || letters.length === 0) return;
       const tl = gsap.timeline({ defaults: { ease: 'power3.out' } });
       tl.from(letters, {
-        y: 50,
+        y: 28,
         opacity: 0,
-        duration: 0.8,
-        stagger: 0.035,
+        duration: 0.7,
+        stagger: 0.025,
+        clearProps: 'transform,opacity',
       });
       if (subRef.current) {
-        tl.from(subRef.current, { opacity: 0, y: 10, duration: 0.6 }, '-=0.3');
+        tl.from(subRef.current, { opacity: 0, y: 12, duration: 0.55, clearProps: 'transform,opacity' }, '-=0.25');
       }
     });
 

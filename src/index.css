@@ -30,9 +30,9 @@
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --animate-fade-in: fade-in 0.5s var(--ease-out-expo) both;
-  --animate-sheet-up: sheet-up 0.55s var(--ease-out-expo) both;
-  --animate-pop-in: pop-in 0.5s var(--ease-spring) both;
+  --animate-fade-in: fade-in 0.3s var(--ease-out-expo) both;
+  --animate-sheet-up: sheet-up 0.38s var(--ease-out-expo) both;
+  --animate-pop-in: pop-in 0.32s var(--ease-spring) both;
 }
 
 @keyframes fade-in {
@@ -40,11 +40,11 @@
   to { opacity: 1; }
 }
 @keyframes sheet-up {
-  from { opacity: 0; transform: translateY(32px) scale(0.98); }
-  to { opacity: 1; transform: none; }
+  from { opacity: 0; transform: translate3d(0, 20px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
 }
 @keyframes pop-in {
-  from { opacity: 0; transform: scale(0.92); }
+  from { opacity: 0; transform: scale(0.95); }
   to { opacity: 1; transform: none; }
 }
 
@@ -95,6 +95,10 @@
   --pill-inactive-hover: rgba(255, 255, 255, 0.10);
   --modal-grabber: rgba(255, 255, 255, 0.25);
 
+  /* Retro pixel button (Dark Mode) */
+  --px-border: #F2F4FA;
+  --px-shadow: #C93F82;
+
   color-scheme: dark;
 }
 
@@ -144,6 +148,10 @@
   --pill-inactive-hover: rgba(10, 20, 51, 0.06);
   --modal-grabber: rgba(10, 20, 51, 0.20);
 
+  /* Retro pixel button (Light Mode) */
+  --px-border: #0A1433;
+  --px-shadow: #0A1433;
+
   color-scheme: light;
 }
 
@@ -163,6 +171,32 @@
    BASE
    ========================================================================== */
 @layer base {
+  html {
+    scroll-behavior: smooth;
+    scroll-padding-top: 5.5rem;
+  }
+
+  @media (max-width: 767px) {
+    html {
+      scroll-padding-top: 2rem;
+      scroll-padding-bottom: 5.5rem;
+    }
+  }
+
+  /* Ensure deep-linked and nav-jump sections land with breathing room */
+  section[id],
+  div[id] {
+    scroll-margin-top: 5.5rem;
+  }
+
+  @media (max-width: 767px) {
+    section[id],
+    div[id] {
+      scroll-margin-top: 2rem;
+      scroll-margin-bottom: 5.5rem;
+    }
+  }
+
   html,
   body {
     background-color: var(--canvas);
@@ -182,14 +216,14 @@
     background: color-mix(in oklab, var(--color-pink) 40%, transparent);
   }
 
-  /* Springy press feedback for every button */
+  /* Springy press feedback for standard buttons (excludes pixel and nav buttons) */
   button:not(:disabled) {
-    transition-property: color, background-color, border-color, box-shadow, opacity, scale, translate;
-    transition-duration: 0.25s;
+    transition-property: color, background-color, border-color, box-shadow, opacity, transform;
+    transition-duration: 0.2s;
     transition-timing-function: var(--ease-out-expo);
   }
   button:not(:disabled):active {
-    scale: 0.96;
+    transform: scale(0.97);
     transition-duration: 0.08s;
   }
 
@@ -230,10 +264,10 @@
       0 1px 2px var(--glass-shade),
       0 22px 48px -18px var(--glass-shadow);
     transition:
-      translate 0.6s var(--ease-spring),
-      box-shadow 0.5s var(--ease-out-expo),
-      border-color 0.5s var(--ease-out-expo),
-      background-color 0.5s ease;
+      transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+      box-shadow 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      border-color 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+      background-color 0.4s ease;
   }
 
   /* Specular rim: a gradient hairline that catches "light" on the top-left edge */
@@ -260,10 +294,10 @@
       linear-gradient(#000 0 0);
     opacity: 0.7;
     pointer-events: none;
-    transition: opacity 0.5s ease;
+    transition: opacity 0.4s ease;
   }
 
-  @media (hover: hover) {
+  @media (hover: hover) and (pointer: fine) {
     .glass:hover {
       border-color: color-mix(in oklab, var(--color-white) 18%, transparent);
     }
@@ -271,12 +305,12 @@
       opacity: 1;
     }
     .glass-lift:hover {
-      translate: 0 -3px;
+      transform: translate3d(0, -3px, 0);
       box-shadow:
         inset 0 1px 0 var(--glass-specular),
         inset 0 -1px 0 var(--glass-shade),
         0 2px 4px var(--glass-shade),
-        0 32px 64px -20px var(--glass-shadow);
+        0 28px 56px -16px var(--glass-shadow);
     }
   }
 
@@ -314,69 +348,95 @@
     box-shadow: inset 0 1px 0 var(--glass-specular);
   }
 
-  /* -------- Primary liquid glass button -------- */
+  /* -------- Primary retro pixel button --------
+     Flat pink fill, 8-bit bevel, notched "pixel" border (stacked box-shadows,
+     no border-radius) and a hard offset drop shadow. Press = sink into shadow. */
   .lg-button {
+    --px: 3px; /* one "pixel" */
+    --px-drop: 6px;
     position: relative;
-    isolation: isolate;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 0.75rem;
-    min-height: 52px;
-    padding: 0.9rem 1.9rem;
-    border-radius: 9999px;
-    color: #fff;
-    font-family: var(--font-sans);
-    font-weight: 700;
-    font-size: 0.95rem;
-    letter-spacing: 0.01em;
+    gap: 0.7rem;
+    max-width: 100%;
+    min-height: 50px;
+    margin: var(--px) calc(var(--px) + var(--px-drop)) calc(var(--px) + var(--px-drop)) var(--px);
+    padding: 0.8rem 1.5rem;
+    border: 0;
+    border-radius: 0;
+    color: var(--color-on-pink);
+    background: var(--color-pink);
+    font-family: 'Silkscreen', ui-monospace, monospace;
+    font-weight: 400;
+    font-size: clamp(0.72rem, 2.8vw, 0.85rem);
+    line-height: 1.25;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    text-align: center;
     cursor: pointer;
-    overflow: hidden;
-    background:
-      radial-gradient(120% 140% at 50% 0%, rgba(255, 255, 255, 0.28), transparent 55%),
-      linear-gradient(135deg, #0B2A8A 0%, #1B3FB8 55%, #C93F82 140%);
-    border: 1px solid rgba(255, 255, 255, 0.22);
+    image-rendering: pixelated;
+    -webkit-font-smoothing: none;
     box-shadow:
-      inset 0 1px 0 rgba(255, 255, 255, 0.45),
-      inset 0 -2px 6px rgba(0, 0, 0, 0.25),
-      0 10px 28px -8px rgba(27, 63, 184, 0.65),
-      0 2px 6px rgba(0, 0, 0, 0.25);
-    translate: var(--tx, 0) var(--ty, 0);
+      /* 8-bit bevel */
+      inset calc(var(--px) * -1) calc(var(--px) * -1) 0 0 rgba(0, 0, 0, 0.28),
+      inset var(--px) var(--px) 0 0 rgba(255, 255, 255, 0.45),
+      /* notched pixel border */
+      0 calc(var(--px) * -1) 0 0 var(--px-border),
+      0 var(--px) 0 0 var(--px-border),
+      calc(var(--px) * -1) 0 0 0 var(--px-border),
+      var(--px) 0 0 0 var(--px-border),
+      /* hard offset drop */
+      var(--px-drop) var(--px-drop) 0 0 var(--px-shadow);
     transition:
-      translate 0.5s var(--ease-spring),
-      scale 0.4s var(--ease-spring),
-      box-shadow 0.4s var(--ease-out-expo),
-      filter 0.3s ease;
+      transform 90ms steps(2, end),
+      box-shadow 90ms steps(2, end),
+      filter 90ms steps(2, end);
     user-select: none;
     -webkit-user-select: none;
   }
-  .lg-button::after {
-    content: '';
-    position: absolute;
-    inset: 1px 10% auto;
-    height: 45%;
-    border-radius: 9999px;
-    background: linear-gradient(rgba(255, 255, 255, 0.35), transparent);
-    opacity: 0.6;
-    pointer-events: none;
-    z-index: -1;
-  }
   @media (hover: hover) {
     .lg-button:hover {
-      filter: saturate(1.15) brightness(1.06);
+      transform: translate(-2px, -2px);
+      filter: brightness(1.06);
       box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.5),
-        inset 0 -2px 6px rgba(0, 0, 0, 0.2),
-        0 18px 42px -10px rgba(201, 63, 130, 0.55),
-        0 4px 10px rgba(0, 0, 0, 0.25);
+        inset calc(var(--px) * -1) calc(var(--px) * -1) 0 0 rgba(0, 0, 0, 0.28),
+        inset var(--px) var(--px) 0 0 rgba(255, 255, 255, 0.45),
+        0 calc(var(--px) * -1) 0 0 var(--px-border),
+        0 var(--px) 0 0 var(--px-border),
+        calc(var(--px) * -1) 0 0 0 var(--px-border),
+        var(--px) 0 0 0 var(--px-border),
+        calc(var(--px-drop) + 2px) calc(var(--px-drop) + 2px) 0 0 var(--px-shadow);
     }
   }
   .lg-button:active {
-    scale: 0.95;
+    transform: translate(var(--px-drop), var(--px-drop));
+    box-shadow:
+      /* bevel flips when pressed */
+      inset var(--px) var(--px) 0 0 rgba(0, 0, 0, 0.28),
+      0 calc(var(--px) * -1) 0 0 var(--px-border),
+      0 var(--px) 0 0 var(--px-border),
+      calc(var(--px) * -1) 0 0 0 var(--px-border),
+      var(--px) 0 0 0 var(--px-border);
+  }
+  .lg-button:focus-visible {
+    outline: var(--px) dashed var(--px-border);
+    outline-offset: calc(var(--px) * 3);
   }
   .lg-button:disabled {
-    opacity: 0.6;
     cursor: progress;
+    filter: grayscale(0.35);
+    opacity: 0.7;
+    transform: none;
+  }
+  .lg-button .px-icon {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+    shape-rendering: crispEdges;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lg-button { transition: none; }
   }
 
   /* Icon button (nav, toggles) */
@@ -427,17 +487,16 @@
   /* Scroll reveal for headings marked with data-reveal */
   .reveal-ready [data-reveal] {
     opacity: 0;
-    translate: 0 18px;
-    filter: blur(6px);
+    transform: translate3d(0, 18px, 0);
+    will-change: transform, opacity;
     transition:
-      opacity 0.9s var(--ease-out-expo),
-      translate 0.9s var(--ease-out-expo),
-      filter 0.9s var(--ease-out-expo);
+      opacity 0.65s cubic-bezier(0.16, 1, 0.3, 1),
+      transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
   }
   .reveal-ready [data-reveal].is-visible {
     opacity: 1;
-    translate: 0 0;
-    filter: none;
+    transform: translate3d(0, 0, 0);
+    will-change: auto;
   }
   .reveal-ready [data-reveal='2'] {
     transition-delay: 0.08s;
@@ -448,6 +507,7 @@
    AMBIENT BACKGROUND (fixed, cheap: gradients only, no filter blur)
    ========================================================================== */
 .ambient {
+  --scroll: 0;
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -521,6 +581,7 @@
   .reveal-ready [data-reveal] {
     opacity: 1;
     translate: none;
+    transform: none;
     filter: none;
   }
 }

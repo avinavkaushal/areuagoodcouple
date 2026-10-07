@@ -36,11 +36,11 @@ function Initiator({ messages, senders }) {
           <div className="h-5 w-full bg-track rounded-full flex overflow-hidden p-0.5 border border-glass-divider shadow-inner">
             <div
               style={{ width: `${stats.p1.pct}%` }}
-              className="h-full bg-pink rounded-l-full transition-all duration-700 dark:shadow-[0_0_14px_rgba(255,133,187,0.4)]"
+              className="h-full bg-pink rounded-l-full transition-[width] duration-700 ease-out dark:shadow-[0_0_14px_rgba(255,133,187,0.4)]"
             />
             <div
               style={{ width: `${stats.p2.pct}%` }}
-              className="h-full bg-blush rounded-r-full transition-all duration-700 dark:shadow-[0_0_14px_rgba(255,206,227,0.3)]"
+              className="h-full bg-blush rounded-r-full transition-[width] duration-700 ease-out dark:shadow-[0_0_14px_rgba(255,206,227,0.3)]"
             />
           </div>
 

@@ -18,8 +18,8 @@ function RandomMemory({ messages }) {
     if (cardRef.current) {
       gsap.fromTo(
         cardRef.current,
-        { opacity: 0, y: 14, scale: 0.98 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.45, ease: 'power2.out' }
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.4, ease: 'power3.out', clearProps: 'transform,opacity' }
       );
     }
     setMemory(next);
@@ -28,13 +28,14 @@ function RandomMemory({ messages }) {
   useEffect(() => {
     const ctx = gsap.context(() => {
       gsap.from('.memory-container', {
-        y: 28,
+        y: 20,
         opacity: 0,
-        duration: 0.8,
-        ease: 'power2.out',
+        duration: 0.65,
+        ease: 'power3.out',
+        clearProps: 'transform,opacity',
         scrollTrigger: {
           trigger: sectionRef.current,
-          start: 'top 75%',
+          start: 'top 82%',
           once: true,
         },
       });

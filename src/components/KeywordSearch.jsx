@@ -105,7 +105,7 @@ function KeywordSearch({ messages }) {
         gsap.fromTo(
           resultRef.current,
           { opacity: 0, y: 12 },
-          { opacity: 1, y: 0, duration: 0.4, ease: 'power2.out' }
+          { opacity: 1, y: 0, duration: 0.4, ease: 'power3.out', clearProps: 'transform,opacity' }
         );
       });
       return () => ctx.revert();

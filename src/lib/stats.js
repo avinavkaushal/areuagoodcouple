@@ -1,6 +1,6 @@
-import { isUnwantedMessageText } from './parseChat.js';
+import { isUnwantedMessageText, isDeletedMessageText } from './parseChat.js';
 
-export { isUnwantedMessageText };
+export { isUnwantedMessageText, isDeletedMessageText };
 
 const EMOJI_RE = /(\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)/gu;
 

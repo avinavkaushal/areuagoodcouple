@@ -244,6 +244,19 @@ export function parseTelegramJson(json, nicknameMap = {}) {
 }
 
 /**
+ * Detects deleted / unsent message placeholders across platforms
+ * (e.g. WhatsApp "This message was deleted", "You deleted this message",
+ * Instagram "You unsent a message", etc.)
+ * @param {string} text
+ * @returns {boolean}
+ */
+export function isDeletedMessageText(text) {
+  if (typeof text !== 'string') return false;
+  const clean = text.replace(/^["'“”‘’]+|["'“”‘’]+$/g, '').trim();
+  return /^(?:this message was deleted|you deleted this message|this message was deleted by (?:an?|a group) admin|you unsent a message|unsent a message|this message was unsent)\.?$/i.test(clean);
+}
+
+/**
  * Parse WhatsApp chat export (.txt format)
  * @param {string} text
  * @param {Record<string, 'Her' | 'Him' | string>} [nicknameMap={}]
@@ -257,6 +270,7 @@ export function parseWhatsApp(text, nicknameMap = {}) {
   const lines = text.split(/\r?\n/);
   const messages = [];
   const rawSenderSet = new Set();
+  let lastWasDeleted = false;
 
   for (const rawLine of lines) {
     // Strip invisible unicode directional formatting characters
@@ -274,11 +288,22 @@ export function parseWhatsApp(text, nicknameMap = {}) {
         rawSenderSet.add(rawSender);
         const mappedSender = nicknameMap[rawSender] || rawSender;
 
+        const trimmedMsg = (msg || '').trim();
+
+        // Filter out deleted messages (e.g. "This message was deleted", "You deleted this message")
+        if (isDeletedMessageText(trimmedMsg)) {
+          lastWasDeleted = true;
+          continue;
+        }
+        lastWasDeleted = false;
+
         let type = 'text';
-        if (msg.includes('<sticker omitted>') || msg.includes('sticker omitted')) {
+        if (trimmedMsg.includes('<sticker omitted>') || trimmedMsg.includes('sticker omitted')) {
           type = 'sticker';
-        } else if (msg.includes('<Media omitted>') || msg.includes('omitted>')) {
+        } else if (trimmedMsg.includes('<Media omitted>') || trimmedMsg.includes('omitted>')) {
           type = 'media';
+        } else if (isUnwantedMessageText(trimmedMsg)) {
+          type = 'system';
         }
 
         const chatMsg = createChatMessage({
@@ -293,7 +318,7 @@ export function parseWhatsApp(text, nicknameMap = {}) {
 
         messages.push(chatMsg);
       }
-    } else if (messages.length > 0) {
+    } else if (!lastWasDeleted && messages.length > 0) {
       messages[messages.length - 1].text += '\n' + rawLine;
     }
   }
@@ -396,8 +421,8 @@ function isDeletedOrUnsent(m, decodedContent) {
   const text = (decodedContent || '').trim();
   // Empty content with no media/share
   if (!hasMedia && !text) return true;
-  // Instagram unsent placeholder text
-  if (!hasMedia && /^(you unsent a message|unsent a message|this message was unsent)$/i.test(text)) {
+  // Deleted / unsent placeholder text
+  if (!hasMedia && isDeletedMessageText(text)) {
     return true;
   }
   return false;
@@ -406,7 +431,8 @@ function isDeletedOrUnsent(m, decodedContent) {
 /**
  * Detects unwanted system, call, attachment, or non-conversational event messages
  * (e.g. "you sent an attachment", "Liked a message", "reacted ❤️ to your message",
- * "you change the theme to <theme>", "started an audio call", "audio call ended", "you missed an audio call", etc.)
+ * "you change the theme to <theme>", "started an audio call", "audio call ended", "you missed an audio call",
+ * "This message was deleted", "You deleted this message", etc.)
  * @param {string} text
  * @returns {boolean}
  */
@@ -471,13 +497,13 @@ export function isUnwantedMessageText(text) {
     return true;
   }
 
-  // 8. Other system events (disappearing messages, polls, group names, pins, unsent)
+  // 8. Other system events (disappearing messages, polls, group names, pins, unsent, deleted)
   if (
     /(?:turned on|turned off|set) disappearing messages/i.test(clean) ||
     /^(?:.*?\s+)?(?:named the group|changed the group name|changed the group photo)\b.*$/i.test(clean) ||
     /^(?:.*?\s+)?(?:created a poll|voted in a poll)\b.*$/i.test(clean) ||
     /^(?:.*?\s+)?(?:pinned a message|unpinned a message)\.?$/i.test(clean) ||
-    /^(?:you unsent a message|unsent a message|this message was unsent)$/i.test(clean) ||
+    isDeletedMessageText(clean) ||
     /end-to-end encrypted/i.test(clean)
   ) {
     return true;

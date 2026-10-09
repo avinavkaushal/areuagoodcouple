@@ -12,7 +12,6 @@ import Hero from './components/Hero';
 import CrossPlatformStats from './components/CrossPlatformStats';
 import Milestones from './components/Milestones';
 import CalendarHeat from './components/CalendarHeat';
-import Highlights from './components/Highlights';
 import ReelStats from './components/ReelStats';
 import MediaBreakdown from './components/MediaBreakdown';
 import ActivityHeatmap from './components/ActivityHeatmap';
@@ -796,9 +795,6 @@ function App() {
       </SectionErrorBoundary>
       <SectionErrorBoundary name="CalendarHeat">
         <CalendarHeat messages={validMessages} senders={senders} />
-      </SectionErrorBoundary>
-      <SectionErrorBoundary name="Highlights">
-        <Highlights messages={validMessages} senders={senders} />
       </SectionErrorBoundary>
       <SectionErrorBoundary name="ReelStats">
         <ReelStats messages={validMessages} senders={senders} />

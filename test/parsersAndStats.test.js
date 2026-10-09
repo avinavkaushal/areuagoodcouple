@@ -12,6 +12,7 @@ import {
   flattenTelegramText,
   fixMojibake,
   isUnwantedMessageText,
+  isDeletedMessageText,
 } from '../src/lib/parseChat.js';
 import { resolveSenderMapping } from '../src/lib/nicknameConfig.js';
 import {
@@ -1439,5 +1440,107 @@ describe('Instagram Unwanted Message Filtering and Roll a Memory Cleanliness', (
   });
 });
 
+describe('WhatsApp Deleted and Unwanted Message Filtering', () => {
+  const deletedPhrases = [
+    'This message was deleted',
+    'This message was deleted.',
+    'this message was deleted',
+    ' This message was deleted ',
+    'You deleted this message',
+    'You deleted this message.',
+    'you deleted this message',
+    'This message was deleted by an admin',
+    'This message was deleted by a group admin.',
+    'You unsent a message',
+    'unsent a message',
+    'this message was unsent',
+  ];
 
+  test('isDeletedMessageText and isUnwantedMessageText detect all deleted message forms', () => {
+    for (const phrase of deletedPhrases) {
+      assert.equal(
+        isDeletedMessageText(phrase),
+        true,
+        `Expected isDeletedMessageText("${phrase}") to be true`
+      );
+      assert.equal(
+        isUnwantedMessageText(phrase),
+        true,
+        `Expected isUnwantedMessageText("${phrase}") to be true`
+      );
+    }
 
+    assert.equal(isDeletedMessageText('Why was this message deleted?'), false);
+    assert.equal(isDeletedMessageText('I thought you deleted this message earlier'), false);
+  });
+
+  test('parseWhatsApp strips deleted messages while preserving participant detection', () => {
+    const rawWhatsAppText = [
+      '21/10/24, 16:10 - Her: Good morning baby ❤️',
+      '21/10/24, 16:11 - Him: This message was deleted',
+      '21/10/24, 16:12 - Him: You deleted this message',
+      '21/10/24, 16:13 - Him: morning gorgeous! sorry sent wrong thing',
+      '21/10/24, 16:14 - Her: This message was deleted.',
+      '21/10/24, 16:15 - Her: haha all good!',
+    ].join('\n');
+
+    const result = parseWhatsApp(rawWhatsAppText, { Her: 'Her', Him: 'Him' });
+
+    assert.equal(result.platform, 'whatsapp');
+    assert.deepEqual(result.rawSenders.sort(), ['Her', 'Him'].sort());
+    assert.deepEqual(result.senders.sort(), ['Her', 'Him'].sort());
+
+    // 6 raw entries - 3 deleted = 3 real messages
+    assert.equal(result.messages.length, 3);
+    assert.equal(result.messages[0].text, 'Good morning baby ❤️');
+    assert.equal(result.messages[1].text, 'morning gorgeous! sorry sent wrong thing');
+    assert.equal(result.messages[2].text, 'haha all good!');
+
+    // Ensure no deleted message text is present
+    for (const msg of result.messages) {
+      assert.equal(isDeletedMessageText(msg.text), false);
+    }
+  });
+
+  test('parseWhatsApp marks missed calls as system messages', () => {
+    const rawWhatsAppText = [
+      '21/10/24, 16:10 - Her: Missed voice call',
+      '21/10/24, 16:11 - Him: Missed video call',
+      '21/10/24, 16:12 - Her: Hey sorry missed your call!',
+    ].join('\n');
+
+    const result = parseWhatsApp(rawWhatsAppText);
+    assert.equal(result.messages.length, 3);
+    assert.equal(result.messages[0].type, 'system');
+    assert.equal(result.messages[1].type, 'system');
+    assert.equal(result.messages[2].type, 'text');
+
+    const nonSystem = getNonSystemMessages(result.messages);
+    assert.equal(nonSystem.length, 1);
+    assert.equal(nonSystem[0].text, 'Hey sorry missed your call!');
+  });
+
+  test('getRandomMemory never returns deleted message placeholders', () => {
+    const rawWithDeleted = [
+      { sender: 'Her', type: 'text', timestamp: new Date('2024-10-01T10:00:00'), text: 'This message was deleted' },
+      { sender: 'Him', type: 'text', timestamp: new Date('2024-10-01T10:01:00'), text: 'You deleted this message' },
+      {
+        sender: 'Her',
+        type: 'text',
+        timestamp: new Date('2024-10-01T10:02:00'),
+        text: 'I cannot wait to marry you one day ❤️',
+      },
+      { sender: 'Him', type: 'text', timestamp: new Date('2024-10-01T10:03:00'), text: 'This message was deleted.' },
+    ];
+
+    assert.equal(isEligibleMemoryCandidate(rawWithDeleted[0]), false);
+    assert.equal(isEligibleMemoryCandidate(rawWithDeleted[1]), false);
+    assert.equal(isEligibleMemoryCandidate(rawWithDeleted[2]), true);
+    assert.equal(isEligibleMemoryCandidate(rawWithDeleted[3]), false);
+
+    const mem = getRandomMemory(rawWithDeleted);
+    assert.ok(mem);
+    assert.equal(mem.messages.length, 1);
+    assert.equal(mem.messages[0].text, 'I cannot wait to marry you one day ❤️');
+  });
+});

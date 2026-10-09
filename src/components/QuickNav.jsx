@@ -4,7 +4,6 @@ const NAV_ITEMS = [
   { id: 'unified', label: 'Unified', icon: '🌐' },
   { id: 'milestones', label: 'Milestones', icon: '🏆' },
   { id: 'calendar', label: 'Calendar', icon: '📅' },
-  { id: 'highlights', label: 'Highlights', icon: '✨' },
   { id: 'reels', label: 'Reels', icon: '🎬' },
   { id: 'media-breakdown', label: 'Media', icon: '📸' },
   { id: 'activity', label: 'Activity', icon: '⏰' },

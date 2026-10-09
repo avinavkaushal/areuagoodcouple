@@ -11,6 +11,45 @@ function prefersReducedMotion() {
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 }
 
+export function checkAmbientBarrier(
+  win = typeof window !== 'undefined' ? window : null,
+  doc = typeof document !== 'undefined' ? document : null
+) {
+  if (!win || !doc) return false;
+
+  const unifiedEl = doc.getElementById('unified');
+  const milestonesEl = doc.getElementById('milestones');
+  const exportGuideEl = doc.getElementById('export-guide');
+
+  // Results screen: trigger when scrolled halfway through Unified or almost reaching Milestones
+  if (unifiedEl || milestonesEl) {
+    if (unifiedEl) {
+      const uRect = unifiedEl.getBoundingClientRect();
+      // Halfway through Unified: midpoint reached/passed viewport center or top scrolled into 2nd half
+      const halfwayUnified =
+        uRect.top + uRect.height * 0.5 <= win.innerHeight * 0.5 ||
+        uRect.top <= -(uRect.height * 0.35);
+      if (halfwayUnified) return true;
+    }
+    if (milestonesEl) {
+      const mRect = milestonesEl.getBoundingClientRect();
+      // Almost reaching Milestones: milestone top is close to entering or within viewport
+      const nearMilestones = mRect.top <= win.innerHeight + 150;
+      if (nearMilestones) return true;
+    }
+    return false;
+  }
+
+  // Landing screen fallback: fade in when scrolled past hero towards export guide/FAQ
+  if (exportGuideEl) {
+    const egRect = exportGuideEl.getBoundingClientRect();
+    return egRect.top <= win.innerHeight * 0.85 || (win.scrollY || 0) > 250;
+  }
+
+  // Generic fallback if neither story nor landing is mounted
+  return (win.scrollY || 0) > 300;
+}
+
 function setupScrollProgress() {
   let frame = 0;
   let ambientEl = null;
@@ -24,16 +63,27 @@ function setupScrollProgress() {
     const max = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
     const progress = (window.scrollY / max).toFixed(4);
     ambientEl.style.setProperty('--scroll', progress);
+
+    const isVisible = checkAmbientBarrier();
+    ambientEl.classList.toggle('is-visible', isVisible);
   };
   const onScroll = () => {
     if (!frame) frame = requestAnimationFrame(update);
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   window.addEventListener('resize', onScroll, { passive: true });
+
+  let mo = null;
+  if ('MutationObserver' in window && document.body) {
+    mo = new MutationObserver(() => onScroll());
+    mo.observe(document.body, { childList: true, subtree: true });
+  }
+
   update();
   return () => {
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onScroll);
+    if (mo) mo.disconnect();
     if (frame) cancelAnimationFrame(frame);
   };
 }

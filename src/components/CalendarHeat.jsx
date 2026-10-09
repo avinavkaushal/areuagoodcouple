@@ -64,8 +64,24 @@ function CalendarHeat({ messages }) {
       ? 'bg-tg-pink'
       : 'bg-pink';
 
+  const showDay = (e, item, dateStr) => {
+    e.stopPropagation();
+    const r = e.currentTarget.getBoundingClientRect();
+    setHoveredDay({
+      dateStr,
+      weekday: item.date.toLocaleDateString('en-US', { weekday: 'short' }),
+      count: item.count,
+      x: r.left + r.width / 2,
+      y: r.top,
+    });
+  };
+
   return (
-    <section id="calendar" className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32">
+    <section
+      id="calendar"
+      onClick={() => setHoveredDay(null)}
+      className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32"
+    >
       <div className="relative z-10 max-w-5xl mx-auto w-full">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 sm:mb-6 min-w-0">
           <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold">
@@ -86,7 +102,10 @@ function CalendarHeat({ messages }) {
 
         {/* Glass card enclosing the graph */}
         <div className="glass rounded-3xl p-6 sm:p-8 space-y-4">
-          <div className="overflow-x-auto no-scrollbar pb-2 pt-1">
+          <div
+            className="overflow-x-auto no-scrollbar py-3 px-2"
+            onScroll={() => setHoveredDay(null)}
+          >
             <div className="inline-flex gap-3 items-center min-w-max">
               {/* Day of week labels */}
               <div className="grid grid-rows-7 gap-[3px] text-[10px] font-sans text-cloud/40 pr-1 select-none">
@@ -98,7 +117,7 @@ function CalendarHeat({ messages }) {
               </div>
 
               {/* Grid of contribution squares (7 rows, flow col) */}
-              <div className="grid grid-rows-7 grid-flow-col gap-[3px]">
+              <div className="grid grid-rows-7 grid-flow-col gap-[3px] [&:hover>div:not(:hover)]:brightness-75">
                 {paddedDays.map((item, idx) => {
                   if (!item) {
                     return <div key={`pad-${idx}`} className="w-3.5 h-3.5" />;
@@ -114,12 +133,12 @@ function CalendarHeat({ messages }) {
                   return (
                     <div
                       key={item.date.toISOString()}
-                      onMouseEnter={() => setHoveredDay({ dateStr, count: item.count })}
+                      onMouseEnter={(e) => showDay(e, item, dateStr)}
                       onMouseLeave={() => setHoveredDay(null)}
-                      onClick={() => setHoveredDay({ dateStr, count: item.count })}
+                      onClick={(e) => showDay(e, item, dateStr)}
                       style={{ opacity }}
-                      className={`w-3.5 h-3.5 rounded-[3px] transition-[transform,opacity,filter] duration-150 hover:scale-150 hover:z-20 cursor-pointer ${
-                        isZero ? 'bg-empty-cell hover:opacity-100' : `${activeSquareColor} hover:brightness-110 hover:shadow-sm`
+                      className={`w-3.5 h-3.5 rounded-[3px] cursor-pointer transition-[transform,opacity,filter,box-shadow] duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)] hover:scale-[1.7] hover:z-20 hover:!opacity-100 hover:opacity-100! hover:!brightness-125 hover:brightness-125! hover:ring-2 hover:ring-white/50 hover:shadow-[0_0_12px_rgba(255,133,187,0.7)] ${
+                        isZero ? 'bg-empty-cell' : activeSquareColor
                       }`}
                     />
                   );
@@ -154,6 +173,26 @@ function CalendarHeat({ messages }) {
           </div>
         </div>
       </div>
+
+      {hoveredDay && (
+        <div
+          className="fixed z-50 pointer-events-none -translate-x-1/2 -translate-y-full -mt-3 px-3 py-1.5 rounded-xl text-xs font-sans whitespace-nowrap text-cloud shadow-xl"
+          style={{
+            left: hoveredDay.x,
+            top: hoveredDay.y,
+            background: 'rgba(2, 26, 84, 0.85)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.15)',
+          }}
+        >
+          <span className="text-pink font-semibold">
+            {hoveredDay.weekday}, {hoveredDay.dateStr}
+          </span>
+          <span className="mx-1.5 text-cloud/40">·</span>
+          {hoveredDay.count.toLocaleString()} messages
+        </div>
+      )}
     </section>
   );
 }

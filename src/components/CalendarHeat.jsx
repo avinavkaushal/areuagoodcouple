@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { getCalendarHeat, formatDuration } from '../lib/stats';
 import LiquidGlassSwitcher from './LiquidGlassSwitcher';
 
@@ -7,6 +7,19 @@ const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 function CalendarHeat({ messages }) {
   const [activeFilter, setActiveFilter] = useState('all');
   const [hoveredDay, setHoveredDay] = useState(null);
+
+  useEffect(() => {
+    if (!hoveredDay) return;
+
+    const handleScroll = () => {
+      setHoveredDay(null);
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true, capture: true });
+    return () => {
+      window.removeEventListener('scroll', handleScroll, { capture: true });
+    };
+  }, [hoveredDay]);
 
   const platformCounts = useMemo(() => {
     const counts = { all: (messages || []).length, whatsapp: 0, instagram: 0, telegram: 0 };
@@ -17,7 +30,20 @@ function CalendarHeat({ messages }) {
     return counts;
   }, [messages]);
 
+  const platformSources = useMemo(() => {
+    const set = new Set();
+    for (const m of messages || []) {
+      if (m && m.type !== 'system' && m.platform) {
+        set.add(m.platform);
+      }
+    }
+    return Array.from(set);
+  }, [messages]);
+
+  const hasMultiplePlatforms = platformSources.length > 1;
+
   const filterOptions = useMemo(() => {
+    if (!hasMultiplePlatforms) return [];
     const opts = [{ id: 'all', label: 'All', count: platformCounts.all }];
     if (platformCounts.whatsapp > 0) {
       opts.push({ id: 'whatsapp', label: 'WhatsApp', color: 'var(--color-wa-pink)', count: platformCounts.whatsapp });
@@ -29,7 +55,7 @@ function CalendarHeat({ messages }) {
       opts.push({ id: 'telegram', label: 'Telegram', color: 'var(--color-tg-pink)', count: platformCounts.telegram });
     }
     return opts;
-  }, [platformCounts]);
+  }, [platformCounts, hasMultiplePlatforms]);
 
   const filteredMessages = useMemo(() => {
     if (activeFilter === 'all') return messages || [];
@@ -89,11 +115,13 @@ function CalendarHeat({ messages }) {
           </p>
 
           {/* Liquid Glass Switcher */}
-          <LiquidGlassSwitcher
-            options={filterOptions}
-            activeValue={activeFilter}
-            onChange={setActiveFilter}
-          />
+          {hasMultiplePlatforms && (
+            <LiquidGlassSwitcher
+              options={filterOptions}
+              activeValue={activeFilter}
+              onChange={setActiveFilter}
+            />
+          )}
         </div>
 
         <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight max-w-2xl font-semibold mb-8 sm:mb-10">

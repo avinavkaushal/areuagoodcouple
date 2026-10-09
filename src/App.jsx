@@ -579,7 +579,7 @@ function App() {
         {/* Sticky Glass Site Header */}
         <SiteHeader onReset={handleResetChat} />
 
-        <div className="w-full max-w-[560px] flex flex-col items-center relative z-10">
+        <div className={`w-full max-w-[560px] flex flex-col items-center relative z-10 ${pendingChat ? 'my-auto flex-1 justify-center' : ''}`}>
           {!pendingChat && <UploadHero />}
 
           {/* Main Drop / Upload / Confirmation Card */}
@@ -671,16 +671,14 @@ function App() {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
           style={{ background: 'var(--scrim)', WebkitBackdropFilter: 'blur(10px)', backdropFilter: 'blur(10px)' }}
           onClick={() => setPendingAdditionalChat(null)}
         >
           <div
-            className="w-full sm:max-w-md glass glass-strong rounded-t-[32px] sm:rounded-[32px] px-6 pt-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:p-8 relative select-none animate-sheet-up"
+            className="w-full max-w-md glass glass-strong rounded-[32px] p-6 sm:p-8 relative select-none animate-pop-in"
             onClick={(e) => e.stopPropagation()}
           >
-            {/* Sheet grabber (mobile) */}
-            <div className="sm:hidden mx-auto mb-4 h-1.5 w-10 rounded-full" style={{ backgroundColor: 'var(--modal-grabber)' }} aria-hidden="true" />
 
             <button
               type="button"

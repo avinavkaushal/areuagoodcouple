@@ -20,7 +20,22 @@ function Milestones({ messages, senders }) {
     return counts;
   }, [messages]);
 
+  const platformSources = useMemo(() => {
+    const set = new Set();
+    for (const m of messages || []) {
+      if (m && m.type !== 'system' && m.platform) {
+        set.add(m.platform);
+      }
+    }
+    return Array.from(set).map((p) =>
+      p === 'instagram' ? 'Instagram' : p === 'telegram' ? 'Telegram' : 'WhatsApp'
+    );
+  }, [messages]);
+
+  const hasMultipleSources = platformSources.length > 1;
+
   const filterOptions = useMemo(() => {
+    if (!hasMultipleSources) return [];
     const opts = [{ id: 'all', label: 'All', count: platformCounts.all }];
     if (platformCounts.whatsapp > 0) {
       opts.push({ id: 'whatsapp', label: 'WhatsApp', color: 'var(--color-wa-pink)', count: platformCounts.whatsapp });
@@ -32,7 +47,7 @@ function Milestones({ messages, senders }) {
       opts.push({ id: 'telegram', label: 'Telegram', color: 'var(--color-tg-pink)', count: platformCounts.telegram });
     }
     return opts;
-  }, [platformCounts]);
+  }, [platformCounts, hasMultipleSources]);
 
   const filteredMessages = useMemo(() => {
     if (activeFilter === 'all') return messages || [];
@@ -64,20 +79,6 @@ function Milestones({ messages, senders }) {
     return () => ctx.revert();
   }, []);
 
-  const platformSources = useMemo(() => {
-    const set = new Set();
-    for (const m of messages || []) {
-      if (m && m.type !== 'system' && m.platform) {
-        set.add(m.platform);
-      }
-    }
-    return Array.from(set).map((p) =>
-      p === 'instagram' ? 'Instagram' : p === 'telegram' ? 'Telegram' : 'WhatsApp'
-    );
-  }, [messages]);
-
-  const hasMultipleSources = platformSources.length > 1;
-
   const accentColor =
     activeFilter === 'whatsapp'
       ? 'text-wa-pink'
@@ -100,11 +101,13 @@ function Milestones({ messages, senders }) {
           </p>
 
           {/* Liquid Glass Platform Switcher */}
-          <LiquidGlassSwitcher
-            options={filterOptions}
-            activeValue={activeFilter}
-            onChange={setActiveFilter}
-          />
+          {hasMultipleSources && (
+            <LiquidGlassSwitcher
+              options={filterOptions}
+              activeValue={activeFilter}
+              onChange={setActiveFilter}
+            />
+          )}
         </div>
 
         <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight font-semibold mb-6 sm:mb-8">

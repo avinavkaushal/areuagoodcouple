@@ -92,7 +92,7 @@ function ReelStats({ messages, senders }) {
           <div className="reel-card glass glass-lift rounded-3xl p-6 sm:p-7 flex flex-col justify-between">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-chip text-pink text-xs font-semibold mb-3">
-                <span>🏓 Reel Ping-Pong Streak</span>
+                <span>Reel Ping-Pong Streak</span>
               </div>
               <p className="font-sans text-cloud/60 text-xs font-medium">Longest back-and-forth volley</p>
               <div className="font-serif font-semibold text-pink text-4xl sm:text-5xl my-2.5 flex items-baseline gap-2">
@@ -113,7 +113,7 @@ function ReelStats({ messages, senders }) {
           <div className="reel-card glass glass-lift rounded-3xl p-6 sm:p-7 flex flex-col justify-between">
             <div>
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full glass-chip text-pink text-xs font-semibold mb-3">
-                <span>🔥 Peak Reel Period</span>
+                <span>Peak Reel Period</span>
               </div>
               <p className="font-sans text-cloud/60 text-xs font-medium">Most active month for reels</p>
               <div className="font-serif font-semibold text-pink text-3xl sm:text-4xl my-2.5">

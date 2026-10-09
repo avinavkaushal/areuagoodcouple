@@ -48,6 +48,170 @@ function QuickNav({ messages, onOpenSettings }) {
   const [highlightedId, setHighlightedId] = useState('milestones');
   const [compact, setCompact] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMenuClosing, setIsMenuClosing] = useState(false);
+  const closeMenuTimeoutRef = useRef(null);
+  const menuSheetRef = useRef(null);
+  const menuDragRef = useRef({
+    isDragging: false,
+    startY: 0,
+    currentY: 0,
+    lastY: 0,
+    lastTime: 0,
+    velocityY: 0,
+    pointerId: null,
+  });
+
+  const openMenu = useCallback(() => {
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+      closeMenuTimeoutRef.current = null;
+    }
+    setIsMenuClosing(false);
+    setIsMenuOpen(true);
+  }, []);
+
+  const closeMenu = useCallback((onClosed) => {
+    if (isMenuClosing || !isMenuOpen) return;
+    setIsMenuClosing(true);
+    if (closeMenuTimeoutRef.current) {
+      clearTimeout(closeMenuTimeoutRef.current);
+    }
+    closeMenuTimeoutRef.current = setTimeout(() => {
+      setIsMenuOpen(false);
+      setIsMenuClosing(false);
+      closeMenuTimeoutRef.current = null;
+      if (typeof onClosed === 'function') {
+        onClosed();
+      }
+    }, 240);
+  }, [isMenuClosing, isMenuOpen]);
+
+  useEffect(() => {
+    return () => {
+      if (closeMenuTimeoutRef.current) {
+        clearTimeout(closeMenuTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    if (menuSheetRef.current) {
+      gsap.set(menuSheetRef.current, { y: 0, opacity: 1 });
+    }
+    const handleEscape = (e) => {
+      if (e.key === 'Escape') closeMenu();
+    };
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isMenuOpen, closeMenu]);
+
+  const handleMenuPointerDown = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (isMenuClosing) return;
+
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      // Ignored
+    }
+
+    if (menuSheetRef.current) {
+      gsap.killTweensOf(menuSheetRef.current);
+    }
+
+    menuDragRef.current = {
+      isDragging: true,
+      startY: e.clientY,
+      currentY: 0,
+      lastY: e.clientY,
+      lastTime: performance.now(),
+      velocityY: 0,
+      pointerId: e.pointerId,
+    };
+  };
+
+  const handleMenuPointerMove = (e) => {
+    const drag = menuDragRef.current;
+    if (!drag.isDragging || drag.pointerId !== e.pointerId) return;
+
+    const deltaY = e.clientY - drag.startY;
+    const effectiveY = deltaY < 0 ? deltaY * 0.25 : deltaY;
+
+    const now = performance.now();
+    const dt = now - drag.lastTime;
+    if (dt > 0) {
+      const vy = (e.clientY - drag.lastY) / (dt / 1000);
+      drag.velocityY = drag.velocityY * 0.4 + vy * 0.6;
+    }
+    drag.lastY = e.clientY;
+    drag.lastTime = now;
+    drag.currentY = effectiveY;
+
+    if (menuSheetRef.current) {
+      gsap.set(menuSheetRef.current, { y: effectiveY });
+    }
+  };
+
+  const handleMenuPointerUp = (e) => {
+    const drag = menuDragRef.current;
+    if (!drag.isDragging || drag.pointerId !== e.pointerId) return;
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignored
+    }
+
+    drag.isDragging = false;
+    const sheet = menuSheetRef.current;
+    if (!sheet) return;
+
+    const shouldDismiss =
+      drag.currentY > 75 || (drag.currentY > 25 && drag.velocityY > 400);
+
+    if (shouldDismiss) {
+      const sheetHeight = sheet.offsetHeight || 320;
+      setIsMenuClosing(true);
+      gsap.to(sheet, {
+        y: sheetHeight + 40,
+        opacity: 0,
+        duration: 0.22,
+        ease: 'power2.in',
+        onComplete: () => {
+          setIsMenuOpen(false);
+          setIsMenuClosing(false);
+          gsap.set(sheet, { y: 0, opacity: 1 });
+        },
+      });
+    } else {
+      gsap.to(sheet, {
+        y: 0,
+        duration: 0.35,
+        ease: 'power3.out',
+      });
+    }
+  };
+
+  const handleMenuPointerCancel = (e) => {
+    const drag = menuDragRef.current;
+    if (!drag.isDragging || drag.pointerId !== e.pointerId) return;
+
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // Ignored
+    }
+
+    drag.isDragging = false;
+    if (menuSheetRef.current) {
+      gsap.to(menuSheetRef.current, {
+        y: 0,
+        duration: 0.3,
+        ease: 'power3.out',
+      });
+    }
+  };
 
   const navRootRef = useRef(null);
   const navContainerRef = useRef(null);
@@ -700,11 +864,12 @@ function QuickNav({ messages, onOpenSettings }) {
         ref={navRootRef}
         aria-label="Quick jump navigation"
         className="fixed left-1/2 -translate-x-1/2 z-50 w-max max-w-[calc(100vw-1.5rem)] select-none
+          [--nav-item-h:50px]
           bottom-[max(1rem,calc(env(safe-area-inset-bottom)+0.5rem))] md:bottom-auto md:top-4 transition-all duration-300 overflow-visible"
       >
         <div
           className={`relative rounded-full flex items-center gap-1 max-w-[calc(100vw-1.5rem)] shadow-2xl transition-all duration-500 overflow-visible ${
-            compact ? 'px-1.5 py-1 scale-[0.97]' : 'px-2 py-1.5'
+            compact ? 'px-1.5 py-1 scale-[0.97]' : 'px-2 py-2'
           }`}
           style={{
             transitionTimingFunction: 'var(--ease-out-expo)',
@@ -715,9 +880,9 @@ function QuickNav({ messages, onOpenSettings }) {
             className="nav-bg absolute inset-0 rounded-full pointer-events-none"
             style={{
               zIndex: 0,
-              background: 'rgba(2, 26, 84, 0.45)',
-              backdropFilter: 'blur(18px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+              background: 'rgba(2, 26, 84, 0.25)',
+              backdropFilter: 'blur(6px) saturate(100%)',
+              WebkitBackdropFilter: 'blur(6px) saturate(100%)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               boxShadow:
                 '0 16px 40px -8px rgba(0, 2, 14, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.20)',
@@ -729,7 +894,7 @@ function QuickNav({ messages, onOpenSettings }) {
           {/* Mobile section grid trigger */}
           <button
             type="button"
-            onClick={() => setIsMenuOpen(true)}
+            onClick={openMenu}
             title="All story sections"
             aria-label="Open sections grid"
             className="relative z-[2] md:hidden lg-icon-btn shrink-0 text-pink hover:text-blush pl-1 pr-1.5 active:!scale-95"
@@ -751,8 +916,8 @@ function QuickNav({ messages, onOpenSettings }) {
             </svg>
           </button>
 
-          {/* Scrollable rail. No vertical padding: nav height = button height (36px).
-              Pill is 32px tall, lift scaleY 1.06 = ~34px, fits with no clip. */}
+          {/* Scrollable rail. No vertical padding: nav height = button height (--nav-item-h).
+              Pill is calc(100% - 4px) tall, fits with no clip. */}
           <div
             ref={navContainerRef}
             className="relative flex items-center gap-0.5 overflow-x-auto overflow-y-hidden no-scrollbar min-w-0 flex-1 touch-pan-y px-1"
@@ -798,7 +963,7 @@ function QuickNav({ messages, onOpenSettings }) {
                   onPointerCancel={handlePointerCancel}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   aria-current={isActive ? 'page' : undefined}
-                  className={`relative z-[2] px-3 sm:px-3.5 min-h-9 rounded-full text-[13px] sm:text-xs font-sans whitespace-nowrap cursor-pointer shrink-0 transition-colors duration-200 active:!scale-100 !transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/80 focus-visible:ring-offset-1 focus-visible:ring-offset-night ${
+                  className={`relative z-[2] px-3 sm:px-3.5 min-h-[var(--nav-item-h)] rounded-full text-sm font-sans whitespace-nowrap cursor-pointer shrink-0 transition-colors duration-200 active:!scale-100 !transform-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/80 focus-visible:ring-offset-1 focus-visible:ring-offset-night ${
                     isLiveHighlighted
                       ? 'text-[#F5F5F5] font-medium'
                       : 'text-[#F5F5F5]/70 hover:text-[#F5F5F5] font-medium'
@@ -855,23 +1020,37 @@ function QuickNav({ messages, onOpenSettings }) {
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 flex items-end justify-center animate-fade-in md:hidden"
+          className={`fixed inset-0 z-50 flex items-end justify-center md:hidden ${
+            isMenuClosing ? 'animate-fade-out pointer-events-none' : 'animate-fade-in'
+          }`}
           style={{
             background: 'var(--scrim)',
             WebkitBackdropFilter: 'blur(10px)',
             backdropFilter: 'blur(10px)',
           }}
-          onClick={() => setIsMenuOpen(false)}
+          onClick={() => closeMenu()}
         >
           <div
-            className="w-full glass glass-strong rounded-t-[32px] px-6 pt-4 pb-[max(2rem,env(safe-area-inset-bottom))] relative select-none animate-sheet-up max-h-[80vh] flex flex-col shadow-2xl"
+            ref={menuSheetRef}
+            className={`w-full glass glass-strong rounded-t-[32px] px-6 pt-2 pb-[max(2rem,env(safe-area-inset-bottom))] relative select-none max-h-[80vh] flex flex-col shadow-2xl ${
+              isMenuClosing ? 'animate-sheet-down' : 'animate-sheet-up'
+            }`}
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Grabber pill with drag-to-dismiss */}
             <div
-              className="mx-auto mb-3 h-1.5 w-10 rounded-full shrink-0"
-              style={{ backgroundColor: 'var(--modal-grabber)' }}
-              aria-hidden="true"
-            />
+              className="w-full pt-2 pb-3 flex flex-col items-center cursor-grab active:cursor-grabbing touch-none select-none"
+              onPointerDown={handleMenuPointerDown}
+              onPointerMove={handleMenuPointerMove}
+              onPointerUp={handleMenuPointerUp}
+              onPointerCancel={handleMenuPointerCancel}
+            >
+              <div
+                className="h-1.5 w-10 rounded-full shrink-0 transition-transform active:scale-110"
+                style={{ backgroundColor: 'var(--modal-grabber)' }}
+                aria-hidden="true"
+              />
+            </div>
 
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-glass-divider shrink-0">
               <div>
@@ -884,7 +1063,7 @@ function QuickNav({ messages, onOpenSettings }) {
               </div>
               <button
                 type="button"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={() => closeMenu()}
                 className="w-8 h-8 rounded-full flex items-center justify-center text-cloud/60 hover:text-cloud glass-chip cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/80"
                 aria-label="Close section menu"
               >
@@ -908,7 +1087,7 @@ function QuickNav({ messages, onOpenSettings }) {
                       } else {
                         scrollToSection(id);
                       }
-                      setIsMenuOpen(false);
+                      closeMenu();
                     }}
                     className={`flex items-center gap-2.5 p-3 rounded-2xl text-left transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink/80 ${
                       isActive

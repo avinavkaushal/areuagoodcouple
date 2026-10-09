@@ -624,7 +624,7 @@ export function getMilestoneStats(messages, senders) {
 
 // 3. Love Word Tracker
 export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby", "babe", "cutie", "❤️", "😘", "darling", "shona", "bae", "miss uh",
-  "sweetheart", "ily", "bubu", "babe", "dudu", "cutie", "jaanu"
+  "sweetheart", "ily", "bubu", "babe", "dudu", "cutie", "jaanu", 'honey', "😚", 'babyy', 'babyyy', 'dudu', 'jaanu', 'muah', 'mwah', 'kiss u', 'kiss you', 'kiss uv',
 ];
 
 export function getLoveWordStats(messages, senders) {

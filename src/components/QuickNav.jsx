@@ -234,6 +234,7 @@ function QuickNav({ messages, onOpenSettings }) {
   // isProgrammaticScrolling: true while page auto-scrolls after click/snap.
   // holdTargetRef: after scroll settles, spy stays quiet until user scrolls on their own.
   const isProgrammaticScrolling = useRef(false);
+  const scrollTimeoutRef = useRef(null);
   const holdTargetRef = useRef(null);
   const holdYRef = useRef(0);
   const lockRafRef = useRef(0);
@@ -415,6 +416,18 @@ function QuickNav({ messages, onOpenSettings }) {
       };
       lockRafRef.current = requestAnimationFrame(tick);
 
+      const onScrollEnd = () => {
+        window.removeEventListener('scrollend', onScrollEnd);
+        if (scrollTimeoutRef.current) {
+          clearTimeout(scrollTimeoutRef.current);
+          scrollTimeoutRef.current = null;
+        }
+        isProgrammaticScrolling.current = false;
+      };
+      window.addEventListener('scrollend', onScrollEnd, { once: true });
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current);
+      scrollTimeoutRef.current = setTimeout(onScrollEnd, 1000);
+
       const reduced = isReducedMotion();
       el.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
     },
@@ -485,11 +498,9 @@ function QuickNav({ messages, onOpenSettings }) {
     const pill = pillRef.current;
     if (!pill) return;
     const reduced = isReducedMotion();
-    const width = dragStateRef.current.currentPillWidth || pill.offsetWidth;
-    const sx = Math.min(1.06, getScaleXCap(width));
     gsap.to(pill, {
-      scaleX: reduced ? 1 : sx,
-      scaleY: reduced ? 1 : LIFT_SCALE_Y,
+      scaleX: reduced ? 1 : 1.10,
+      scaleY: reduced ? 1 : 1.06,
       boxShadow: PILL_SHADOW_LIFT,
       filter: 'brightness(1.12)',
       duration: 0.15,
@@ -880,9 +891,9 @@ function QuickNav({ messages, onOpenSettings }) {
             className="nav-bg absolute inset-0 rounded-full pointer-events-none"
             style={{
               zIndex: 0,
-              background: 'rgba(2, 26, 84, 0.25)',
-              backdropFilter: 'blur(6px) saturate(100%)',
-              WebkitBackdropFilter: 'blur(6px) saturate(100%)',
+              background: 'rgba(2, 26, 84, 0.45)',
+              backdropFilter: 'blur(18px) saturate(160%)',
+              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               boxShadow:
                 '0 16px 40px -8px rgba(0, 2, 14, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.20)',
@@ -917,14 +928,13 @@ function QuickNav({ messages, onOpenSettings }) {
           </button>
 
           {/* Scrollable rail. No vertical padding: nav height = button height (--nav-item-h).
-              Pill is calc(100% - 4px) tall, fits with no clip. */}
+              Pill is calc(100% - 8px) tall, fits with no clip. */}
           <div
             ref={navContainerRef}
             className="relative flex items-center gap-0.5 overflow-x-auto overflow-y-hidden no-scrollbar min-w-0 flex-1 touch-pan-y px-1"
             style={{ overscrollBehaviorX: 'none' }}
           >
-            {/* Draggable glass pill. Inset shadows only, no backdrop-filter:
-                both caused rectangle leak / glow outside nav. */}
+            {/* Draggable glass pill */}
             <div
               ref={pillRef}
               aria-hidden="true"
@@ -935,13 +945,14 @@ function QuickNav({ messages, onOpenSettings }) {
               className="absolute left-0 rounded-full will-change-transform select-none cursor-grab active:cursor-grabbing"
               style={{
                 top: '50%',
-                height: 'calc(100% - 4px)',
+                height: 'calc(100% - 8px)',
                 zIndex: 1,
                 touchAction: 'none',
                 transformOrigin: '50% 50%',
-                background:
-                  'linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 133, 187, 0.28) 100%)',
-                boxShadow: PILL_SHADOW_REST,
+                background: 'rgba(255, 133, 187, 0.25)',
+                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -7px 12px -6px rgba(255, 133, 187, 0.30)',
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
                 border: '1px solid rgba(255, 255, 255, 0.16)',
               }}
             />

@@ -18,6 +18,7 @@ self.onmessage = (e) => {
         const hour = new Date(ts).getHours();
         return {
           textLower: (m.text || '').toLowerCase(),
+          textRaw: m.text || '',
           ts,
           hour,
           sender: m.sender,
@@ -25,7 +26,7 @@ self.onmessage = (e) => {
       });
     self.postMessage({ type: 'INIT_DONE' });
   } else if (type === 'SEARCH') {
-    const { searchId, keyword } = payload;
+    const { searchId, keyword, wholeWord } = payload;
     const kw = (keyword || '').trim().toLowerCase();
 
     if (!kw) {
@@ -37,13 +38,18 @@ self.onmessage = (e) => {
       return;
     }
 
+    const kwRe = wholeWord
+      ? new RegExp(`(?<![\\p{L}\\p{N}])${kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu')
+      : null;
+
     const hourCounts = new Array(24).fill(0);
     const hitTimestamps = [];
     let count = 0;
 
     for (let i = 0; i < messagesData.length; i++) {
       const item = messagesData[i];
-      if (item.textLower.includes(kw)) {
+      const isHit = wholeWord ? kwRe.test(item.textRaw || item.textLower) : item.textLower.includes(kw);
+      if (isHit) {
         count++;
         hourCounts[item.hour]++;
         hitTimestamps.push(item.ts);

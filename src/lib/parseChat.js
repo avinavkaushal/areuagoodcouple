@@ -14,13 +14,31 @@
  * @property {Array<{ emoji: string, sender?: string }>} [meta.reactions]
  */
 
-const WA_LINE_RE = /^\[?(\d{1,2})[/-](\d{1,2})[/-](\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([apAP]\.?\s*[mM]\.?))?(?:\]|\s+-)\s+([^:]+?):\s+(.*)$/;
+const WA_LINE_RE = /^\[?(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\s*([apAP]\.?\s*[mM]\.?))?(?:\]|\s+-)\s+([^:]+?):\s+(.*)$/;
+const WA_HEADER_ONLY_RE = /^\[?\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[apAP]\.?\s*[mM]\.?)?(?:\]|\s+-)\s+/;
+const WA_MEDIA_RE = /^(?:<(?:media|image|video|audio|gif|document)\s+omitted>|(?:image|video|audio|gif|document|contact card|video note) omitted|<attached:[^>]*>|.*\(file attached\))$/i;
 
-function parseDateTime(d, m, y, h, min, sec, ampm) {
+function detectDateOrder(lines) {
+  let dmy = 0;
+  let mdy = 0;
+  for (const l of lines) {
+    const m = l.match(/^\[?(\d{1,2})[/.-](\d{1,2})[/.-]\d{2,4}/);
+    if (!m) continue;
+    if (+m[1] > 12) dmy++;
+    else if (+m[2] > 12) mdy++;
+  }
+  return mdy > dmy ? 'mdy' : 'dmy';
+}
+
+function isWaSystemText(t) {
+  return /end-to-end encrypted|(?:turned on|turned off|set) disappearing messages|^(?:missed )?(?:voice|video) call\b|^https?:\/\/\S+$/i.test(t);
+}
+
+function parseDateTime(a, b, y, h, min, sec, ampm, order = 'dmy') {
   let year = +y;
   if (year < 100) year += 2000;
-  const month = +m - 1;
-  const day = +d;
+  const day = order === 'mdy' ? +b : +a;
+  const month = (order === 'mdy' ? +a : +b) - 1;
   let hour = +h;
   const minutes = +min;
   const seconds = sec ? +sec : 0;
@@ -120,7 +138,28 @@ export function flattenTelegramText(text, textEntities) {
  * @returns {{ platform: 'telegram', messages: ChatMessage[], senders: string[], rawSenders: string[] }}
  */
 export function parseTelegramJson(json, nicknameMap = {}) {
-  const data = typeof json === 'string' ? JSON.parse(json) : json;
+  let data = typeof json === 'string' ? JSON.parse(json) : json;
+  if (!data) {
+    throw new Error('Invalid Telegram export: missing data.');
+  }
+
+  // Handle Telegram full-account export (data.chats.list)
+  if (data.chats && Array.isArray(data.chats.list)) {
+    const personalChats = data.chats.list.filter(
+      (c) => c && c.type === 'personal_chat' && Array.isArray(c.messages)
+    );
+    if (personalChats.length > 0) {
+      personalChats.sort((a, b) => b.messages.length - a.messages.length);
+      data = personalChats[0];
+    } else {
+      const anyChats = data.chats.list.filter((c) => c && Array.isArray(c.messages));
+      if (anyChats.length > 0) {
+        anyChats.sort((a, b) => b.messages.length - a.messages.length);
+        data = anyChats[0];
+      }
+    }
+  }
+
   if (!data || !Array.isArray(data.messages)) {
     throw new Error('Invalid Telegram export: missing top-level messages array.');
   }
@@ -143,6 +182,12 @@ export function parseTelegramJson(json, nicknameMap = {}) {
     const m = rawMessages[i];
     const isService = m.type === 'service' || Boolean(m.action);
 
+    // Determine text
+    let plainText = flattenTelegramText(m.text, m.text_entities);
+    if (!plainText && m.sticker_emoji) {
+      plainText = m.sticker_emoji;
+    }
+
     // Determine message type
     let type = 'text';
     if (isService) {
@@ -156,6 +201,8 @@ export function parseTelegramJson(json, nicknameMap = {}) {
       type = 'sticker';
     } else if (m.media_type || m.photo || m.file || m.mime_type) {
       type = 'media';
+    } else if (/^https?:\/\/\S+$/i.test(plainText.trim())) {
+      type = 'system';
     }
 
     // Determine sender & raw sender
@@ -173,12 +220,6 @@ export function parseTelegramJson(json, nicknameMap = {}) {
     }
     if (isNaN(timestamp.getTime())) {
       timestamp = new Date();
-    }
-
-    // Determine text
-    let plainText = flattenTelegramText(m.text, m.text_entities);
-    if (!plainText && m.sticker_emoji) {
-      plainText = m.sticker_emoji;
     }
 
     // Determine meta
@@ -271,10 +312,11 @@ export function parseWhatsApp(text, nicknameMap = {}) {
   const messages = [];
   const rawSenderSet = new Set();
   let lastWasDeleted = false;
+  const order = detectDateOrder(lines.slice(0, 2000));
 
   for (const rawLine of lines) {
-    // Strip invisible unicode directional formatting characters
-    const line = rawLine.replace(/[\u200E\u200F\u202A-\u202E]/g, '');
+    // Strip invisible unicode directional formatting characters and BOM
+    const line = rawLine.replace(/[\uFEFF\u200E\u200F\u202A-\u202E]/g, '');
     const code = line.charCodeAt(0);
     // Fast-path: header must start with '[' (ASCII 91) or digit '0'-'9' (ASCII 48-57)
     const match = (code === 91 || (code >= 48 && code <= 57)) ? line.match(WA_LINE_RE) : null;
@@ -282,13 +324,14 @@ export function parseWhatsApp(text, nicknameMap = {}) {
     if (match) {
       const [, day, month, year, hour, min, sec, ampm, senderRaw, msg] = match;
       const rawSender = senderRaw.trim();
-      const date = parseDateTime(day, month, year, hour, min, sec, ampm);
+      const date = parseDateTime(day, month, year, hour, min, sec, ampm, order);
 
       if (rawSender) {
         rawSenderSet.add(rawSender);
         const mappedSender = nicknameMap[rawSender] || rawSender;
 
-        const trimmedMsg = (msg || '').trim();
+        const cleanMsg = (msg || '').replace(/\s*<This message was edited>\s*$/i, '');
+        const trimmedMsg = cleanMsg.trim();
 
         // Filter out deleted messages (e.g. "This message was deleted", "You deleted this message")
         if (isDeletedMessageText(trimmedMsg)) {
@@ -298,11 +341,11 @@ export function parseWhatsApp(text, nicknameMap = {}) {
         lastWasDeleted = false;
 
         let type = 'text';
-        if (trimmedMsg.includes('<sticker omitted>') || trimmedMsg.includes('sticker omitted')) {
+        if (trimmedMsg.includes('sticker omitted')) {
           type = 'sticker';
-        } else if (trimmedMsg.includes('<Media omitted>') || trimmedMsg.includes('omitted>')) {
+        } else if (WA_MEDIA_RE.test(trimmedMsg)) {
           type = 'media';
-        } else if (isUnwantedMessageText(trimmedMsg)) {
+        } else if (isWaSystemText(trimmedMsg)) {
           type = 'system';
         }
 
@@ -310,7 +353,7 @@ export function parseWhatsApp(text, nicknameMap = {}) {
           id: `wa-${messages.length}`,
           sender: mappedSender,
           timestamp: date,
-          text: msg,
+          text: cleanMsg,
           type,
           _rawSender: rawSender,
           platform: 'whatsapp',
@@ -318,6 +361,9 @@ export function parseWhatsApp(text, nicknameMap = {}) {
 
         messages.push(chatMsg);
       }
+    } else if (WA_HEADER_ONLY_RE.test(line)) {
+      // dated line with no "Name:" = system event. Do not glue onto previous message.
+      lastWasDeleted = true;
     } else if (!lastWasDeleted && messages.length > 0) {
       messages[messages.length - 1].text += '\n' + rawLine;
     }
@@ -641,6 +687,7 @@ export function parseInstagramJson(jsonOrArray, nicknameMap = {}) {
     const mappedSender = nicknameMap[rawSender] || rawSender;
     const timestamp = new Date(timestamp_ms);
     const type = deriveInstagramMessageType(m, decodedContent);
+    const isShareType = type === 'reel_share' || (type === 'media' && m.share);
 
     // Parse reactions attached to message
     let reactions = undefined;
@@ -692,7 +739,7 @@ export function parseInstagramJson(jsonOrArray, nicknameMap = {}) {
       id: `ig-${timestamp_ms}-${i}`,
       sender: mappedSender,
       timestamp,
-      text: decodedContent || '',
+      text: isShareType ? '' : decodedContent || '',
       type,
       _rawSender: rawSender,
       meta: Object.keys(meta).length > 0 ? meta : undefined,
@@ -745,8 +792,8 @@ export function detectPlatform(text, fileName = '') {
         }
 
         // Telegram detection:
-        // Has top-level messages array (or type: personal_chat / id)
-        if (Array.isArray(obj.messages)) {
+        // Has top-level messages array or chats.list
+        if (Array.isArray(obj.messages) || (obj.chats && Array.isArray(obj.chats.list))) {
           return { platform: 'telegram', data: parsed };
         }
       }

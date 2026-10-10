@@ -161,7 +161,7 @@ function ReactionStats({ messages, senders }) {
                   </div>
 
                   <span className="text-2xl w-10 text-center shrink-0 transition-transform duration-300 group-hover:scale-135 select-none">
-                    {r.emoji}
+                    {r.emoji.replace(/[\uFE0E\uFE0F]/g, '') === '❤' ? '❤️' : r.emoji}
                   </span>
 
                   {/* Right (P2) Bar */}

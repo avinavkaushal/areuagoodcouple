@@ -39,6 +39,8 @@ export function saveStoredNicknameConfig(config) {
  * @param {{ mapping?: Record<string, string> }} [storedConfig]
  * @returns {{ her: string, him: string, mapping: Record<string, 'Her' | 'Him'> }}
  */
+const hasWord = (s, w) => new RegExp(`(^|[^a-z])${w}([^a-z]|$)`, 'i').test(s);
+
 export function resolveSenderMapping(rawSenders = [], storedConfig = getStoredNicknameConfig()) {
   const [s1 = 'Her', s2 = 'Him'] = rawSenders;
   const storedMapping = storedConfig?.mapping || {};
@@ -106,17 +108,15 @@ export function resolveSenderMapping(rawSenders = [], storedConfig = getStoredNi
     };
   }
 
-  // Substring matching
-  const s1Lower = s1.toLowerCase();
-  const s2Lower = s2.toLowerCase();
-  if (s1Lower.includes('her') || s2Lower.includes('him')) {
+  // Whole-word matching (no Heather/Himanshu/Karuna false hits)
+  if (hasWord(s1, 'her') || hasWord(s2, 'him')) {
     return {
       her: s1,
       him: s2,
       mapping: { [s1]: 'Her', [s2]: 'Him' },
     };
   }
-  if (s1Lower.includes('him') || s2Lower.includes('her')) {
+  if (hasWord(s1, 'him') || hasWord(s2, 'her')) {
     return {
       her: s2,
       him: s1,
@@ -125,14 +125,14 @@ export function resolveSenderMapping(rawSenders = [], storedConfig = getStoredNi
   }
 
   // Aru (Her) & Avu (Him) heuristics
-  if (s1Lower.includes('aru') || s2Lower.includes('avu')) {
+  if (hasWord(s1, 'aru') || hasWord(s2, 'avu')) {
     return {
       her: s1,
       him: s2,
       mapping: { [s1]: 'Her', [s2]: 'Him' },
     };
   }
-  if (s1Lower.includes('avu') || s2Lower.includes('aru')) {
+  if (hasWord(s1, 'avu') || hasWord(s2, 'aru')) {
     return {
       her: s2,
       him: s1,

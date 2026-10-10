@@ -47,7 +47,7 @@ function EmojiStats({ messages, senders }) {
                 </div>
 
                 <span className="text-2xl w-10 text-center shrink-0 transition-transform duration-300 group-hover:scale-135 select-none">
-                  {r.emoji}
+                  {r.emoji.replace(/[\uFE0E\uFE0F]/g, '') === '❤' ? '❤️' : r.emoji}
                 </span>
 
                 <div className="flex-1 flex items-center gap-2.5">

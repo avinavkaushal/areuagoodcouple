@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "test": "node --test test/parsersAndStats.test.js test/landingScreen.test.js test/header.test.js test/ambientBlobs.test.js test/quickNav.test.js",
+    "test": "node --test test/parsersAndStats.test.js test/newBugs.test.js test/landingScreen.test.js test/header.test.js test/ambientBlobs.test.js test/quickNav.test.js",
     "preview": "vite preview"
   },
   "dependencies": {

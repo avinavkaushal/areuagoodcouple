@@ -6,6 +6,7 @@ import CountUp from './CountUp';
 function KeywordSearch({ messages }) {
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
+  const [wholeWord, setWholeWord] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const [stats, setStats] = useState(null);
 
@@ -85,18 +86,19 @@ function KeywordSearch({ messages }) {
     if (!debouncedKeyword) return;
 
     const nextId = ++searchIdRef.current;
+    setIsSearching(true);
 
     if (workerRef.current) {
       workerRef.current.postMessage({
         type: 'SEARCH',
-        payload: { searchId: nextId, keyword: debouncedKeyword },
+        payload: { searchId: nextId, keyword: debouncedKeyword, wholeWord },
       });
     } else {
-      const res = getKeywordStats(messages, debouncedKeyword);
+      const res = getKeywordStats(messages, debouncedKeyword, { wholeWord });
       setStats(res);
       setIsSearching(false);
     }
-  }, [debouncedKeyword, messages]);
+  }, [debouncedKeyword, wholeWord, messages]);
 
   // Animate result apparition
   useEffect(() => {
@@ -122,9 +124,23 @@ function KeywordSearch({ messages }) {
   return (
     <section id="search" className="relative overflow-hidden flex flex-col justify-center px-6 sm:px-14 md:px-20 py-24 sm:py-32">
       <div className="relative z-10 max-w-3xl mx-auto w-full">
-        <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold mb-3">
-          a word, counted
-        </p>
+        <div className="flex items-center justify-between mb-3">
+          <p data-reveal className="font-sans text-pink text-xs uppercase tracking-wider font-semibold">
+            a word, counted
+          </p>
+          <button
+            type="button"
+            onClick={() => setWholeWord((prev) => !prev)}
+            className={`text-xs font-sans px-2.5 py-1 rounded-full transition-all cursor-pointer border ${
+              wholeWord
+                ? 'bg-pink/20 text-pink border-pink/50 font-medium'
+                : 'text-cloud/50 border-glass-divider hover:text-cloud/80 hover:border-glass-border'
+            }`}
+            title="Toggle whole word match vs substring match"
+          >
+            {wholeWord ? 'Whole word only' : 'Match parts of words'}
+          </button>
+        </div>
 
         <h2 data-reveal="2" className="sr-only">
           Search keyword history

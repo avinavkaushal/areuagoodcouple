@@ -3,6 +3,26 @@ import { isUnwantedMessageText, isDeletedMessageText } from './parseChat.js';
 export { isUnwantedMessageText, isDeletedMessageText };
 
 const EMOJI_RE = /(\p{Extended_Pictographic}(?:\uFE0F|\uFE0E)?)/gu;
+const NOT_EMOJI = new Set(['©', '®', '™']);
+function toEmojiKey(raw) {
+  const base = raw.replace(/[\uFE0E\uFE0F]/g, '');
+  if (NOT_EMOJI.has(base)) return null;
+  return /\p{Emoji_Presentation}/u.test(base) ? base : base + '\uFE0F';
+}
+
+export function buildPhraseRe(list) {
+  const parts = [...new Set(list.map((w) => w.toLowerCase()))]
+    .sort((a, b) => b.length - a.length)
+    .map((w) => {
+      const base = w.replace(/[\uFE0E\uFE0F]/g, '');
+      const esc = base.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const varSelector = /[\u2764\p{Extended_Pictographic}]/u.test(base) ? '(?:\\uFE0F|\\uFE0E)?' : '';
+      const L = /^[\p{L}\p{N}]/u.test(base) ? '(?<![\\p{L}\\p{N}])' : '';
+      const R = /[\p{L}\p{N}]$/u.test(base) ? '(?![\\p{L}\\p{N}])' : '';
+      return `${L}${esc}${varSelector}${R}`;
+    });
+  return new RegExp(`(?:${parts.join('|')})`, 'gu');
+}
 
 export function formatDuration(firstDate, lastDate) {
   if (!firstDate || !lastDate) return 'our time';
@@ -49,7 +69,9 @@ export function getEmojiStats(messages) {
   for (const m of validMessages) {
     const emojis = (m.text || '').match(EMOJI_RE) || [];
     if (!counts[m.sender]) counts[m.sender] = {};
-    for (const e of emojis) {
+    for (const raw of emojis) {
+      const e = toEmojiKey(raw);
+      if (!e) continue;
       counts[m.sender][e] = (counts[m.sender][e] || 0) + 1;
     }
   }
@@ -71,7 +93,9 @@ export function getEmojiComparison(messages, senders) {
   for (const m of validMessages) {
     const emojis = (m.text || '').match(EMOJI_RE) || [];
     if (!bySender[m.sender]) continue;
-    for (const e of emojis) {
+    for (const raw of emojis) {
+      const e = toEmojiKey(raw);
+      if (!e) continue;
       bySender[m.sender][e] = (bySender[m.sender][e] || 0) + 1;
       total[e] = (total[e] || 0) + 1;
     }
@@ -93,10 +117,15 @@ export function getEmojiComparison(messages, senders) {
   return { order, rows, maxVal };
 }
 
-export function getKeywordStats(messages, keyword) {
+export function getKeywordStats(messages, keyword, options = {}) {
+  const wholeWord = typeof options === 'boolean' ? options : Boolean(options?.wholeWord);
   const kw = (keyword || '').trim().toLowerCase();
   const validMessages = messages || [];
   if (!kw || validMessages.length === 0) return null;
+
+  const kwRe = wholeWord
+    ? new RegExp(`(?<![\\p{L}\\p{N}])${kw.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu')
+    : null;
 
   const hourCounts = new Array(24).fill(0);
   const hitTimestamps = [];
@@ -104,7 +133,9 @@ export function getKeywordStats(messages, keyword) {
 
   for (let i = 0; i < validMessages.length; i++) {
     const m = validMessages[i];
-    if ((m.text || '').toLowerCase().includes(kw)) {
+    const textLower = (m.text || '').toLowerCase();
+    const isHit = wholeWord ? kwRe.test(m.text || '') : textLower.includes(kw);
+    if (isHit) {
       count++;
       const d = getMsgDate(m);
       const h = d.getHours();
@@ -266,8 +297,12 @@ export function getWordCloudData(messages, topN = 40) {
   const validMessages = messages || [];
 
   validMessages.forEach((m) => {
-    if (m && isUnwantedMessageText(m.text)) return;
-    const words = (m.text || '').toLowerCase().match(/[a-z\p{sc=Devanagari}]+/gu) || [];
+    if (!m || isMediaMessage(m) || isUnwantedMessageText(m.text)) return;
+    const words =
+      (m.text || '')
+        .toLowerCase()
+        .replace(/https?:\/\/\S+|www\.\S+/g, ' ')
+        .match(/[\p{L}\p{M}]+/gu) || [];
     words.forEach((w) => {
       if (w.length < 3 || STOPWORDS.has(w)) return;
       counts[w] = (counts[w] || 0) + 1;
@@ -373,12 +408,17 @@ export function getInitiatorStats(messages, senders) {
   const firstMsgByDay = {}; // { YYYY-MM-DD: sender }
   const validMessages = messages || [];
 
+  const QUIET_MS = 3 * 60 * 60 * 1000;
+  let prevT = -Infinity;
   validMessages.forEach((m) => {
     const d = getMsgDate(m);
+    const t = d.getTime();
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    if (!firstMsgByDay[key]) {
+    // first message of the day that also follows a real silence (not midnight spillover)
+    if (!firstMsgByDay[key] && t - prevT > QUIET_MS) {
       firstMsgByDay[key] = m.sender;
     }
+    prevT = t;
   });
 
   let count1 = 0;
@@ -624,8 +664,10 @@ export function getMilestoneStats(messages, senders) {
 
 // 3. Love Word Tracker
 export const LOVE_WORDS = ["love", "miss you", "miss u", "pyaar", "jaan", "baby", "babe", "cutie", "❤️", "😘", "darling", "shona", "bae", "miss uh",
-  "sweetheart", "ily", "bubu", "babe", "dudu", "cutie", "jaanu", 'honey', "😚", 'babyy', 'babyyy', 'dudu', 'jaanu', 'muah', 'mwah', 'kiss u', 'kiss you', 'kiss uv',
+  "sweetheart", "ily", "bubu", "dudu", "jaanu", 'honey', "😚", 'babyy', 'babyyy', 'muah', 'mwah', 'kiss u', 'kiss you', 'kiss uv',
 ];
+
+const LOVE_RE = buildPhraseRe(LOVE_WORDS);
 
 export function getLoveWordStats(messages, senders) {
   const [p1 = 'unknown', p2 = 'unknown'] = senders && senders.length === 2 ? senders : ['unknown', 'unknown'];
@@ -640,37 +682,19 @@ export function getLoveWordStats(messages, senders) {
 
   for (let i = 0; i < validMessages.length; i++) {
     const m = validMessages[i];
-    const textLower = (m.text || '').toLowerCase();
-    let matchedAnyInMsg = false;
-
-    for (let j = 0; j < LOVE_WORDS.length; j++) {
-      const lw = LOVE_WORDS[j];
-      const lwLower = lw.toLowerCase();
-      let pos = 0;
-      let count = 0;
-      while ((pos = textLower.indexOf(lwLower, pos)) !== -1) {
-        count++;
-        pos += lwLower.length;
-      }
-
-      if (count > 0) {
-        matchedAnyInMsg = true;
-        if (wordCounts[lw][m.sender] !== undefined) {
-          wordCounts[lw][m.sender] += count;
-        }
-        wordCounts[lw].total += count;
-        if (totals[m.sender] !== undefined) {
-          totals[m.sender] += count;
-        }
-        totals.overall += count;
-      }
+    const hits = (m.text || '').toLowerCase().match(LOVE_RE);
+    if (!hits) continue;
+    for (const rawLw of hits) {
+      const lw = rawLw.replace(/[\uFE0E\uFE0F]/g, '') === '❤' ? '❤️' : rawLw;
+      if (!wordCounts[lw]) continue;
+      if (wordCounts[lw][m.sender] !== undefined) wordCounts[lw][m.sender]++;
+      wordCounts[lw].total++;
+      if (totals[m.sender] !== undefined) totals[m.sender]++;
+      totals.overall++;
     }
-
-    if (matchedAnyInMsg) {
-      const d = getMsgDate(m);
-      const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      monthlyCounts[mKey] = (monthlyCounts[mKey] || 0) + 1;
-    }
+    const d = getMsgDate(m);
+    const mKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    monthlyCounts[mKey] = (monthlyCounts[mKey] || 0) + 1;
   }
 
   const leaderboard = Object.entries(wordCounts)
@@ -799,12 +823,12 @@ export function getRandomMemory(messages) {
 export const MORNING_PHRASES = ["good morning", "gm", "morning!"];
 export const NIGHT_PHRASES = ["good night", "gn", "night night", "nite"];
 
-function matchesAnyPhrase(text, phrases) {
-  const lower = (text || '').toLowerCase();
-  for (let i = 0; i < phrases.length; i++) {
-    if (lower.includes(phrases[i])) return true;
-  }
-  return false;
+const MORNING_RE = buildPhraseRe(MORNING_PHRASES);
+const NIGHT_RE = buildPhraseRe(NIGHT_PHRASES);
+
+function matchesAnyPhrase(text, re) {
+  re.lastIndex = 0;
+  return re.test((text || '').toLowerCase());
 }
 
 export function getCalloutStats(messages, senders) {
@@ -815,11 +839,11 @@ export function getCalloutStats(messages, senders) {
 
   for (let i = 0; i < validMessages.length; i++) {
     const m = validMessages[i];
-    if (matchesAnyPhrase(m.text, MORNING_PHRASES)) {
+    if (matchesAnyPhrase(m.text, MORNING_RE)) {
       if (morningCounts[m.sender] !== undefined) morningCounts[m.sender]++;
       morningCounts.total++;
     }
-    if (matchesAnyPhrase(m.text, NIGHT_PHRASES)) {
+    if (matchesAnyPhrase(m.text, NIGHT_RE)) {
       if (nightCounts[m.sender] !== undefined) nightCounts[m.sender]++;
       nightCounts.total++;
     }
@@ -828,8 +852,8 @@ export function getCalloutStats(messages, senders) {
   const morningLeader = morningCounts[p1] >= morningCounts[p2] ? p1 : p2;
   const nightLeader = nightCounts[p1] >= nightCounts[p2] ? p1 : p2;
 
-  const longestMorningStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, MORNING_PHRASES));
-  const longestNightStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, NIGHT_PHRASES));
+  const longestMorningStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, MORNING_RE));
+  const longestNightStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, NIGHT_RE));
 
   return {
     senders: [p1, p2],
@@ -1128,8 +1152,9 @@ export function getReactionStats(messages, senders) {
 
     for (const r of dedupedReactions) {
       const actor = r.actor || r.sender;
-      const emoji = r.emoji || r.reaction;
-      if (!emoji) continue;
+      const rawEmoji = r.emoji || r.reaction;
+      if (!rawEmoji) continue;
+      const emoji = rawEmoji.replace(/[\uFE0E\uFE0F]/g, '') === '❤' ? '❤️' : rawEmoji;
 
       if (actor === p1) reactionsSent1++;
       else if (actor === p2) reactionsSent2++;

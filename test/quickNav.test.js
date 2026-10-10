@@ -60,7 +60,7 @@ describe('Apple-Style Draggable Pill QuickNav', () => {
     );
   });
 
-  test('STEP 2 - Rest Size & Centering: top: 50% with yPercent: -50, scaleX 1.10 and scaleY 1.06 max', () => {
+  test('STEP 2 - Rest Size & Centering: top: 50% with yPercent: -50, dynamic scaleX and scaleY max', () => {
     // Rest size: top: 50%, height: calc(100% - 8px), centered with yPercent: -50
     assert.ok(
       quickNavCode.includes("top: '50%'"),
@@ -80,16 +80,18 @@ describe('Apple-Style Draggable Pill QuickNav', () => {
       'Must preserve transformOrigin 50% 50%'
     );
 
-    // Lift scale limits: scaleX 1.10, scaleY 1.06 max
+    // Dynamic lift scale limits: getScaleXCap, scaleY LIFT_SCALE_Y max
     assert.ok(
-      quickNavCode.includes('scaleX: reduced ? 1 : 1.10') ||
-        quickNavCode.includes('scaleX: 1.10'),
-      'Lift tween must set scaleX up to 1.10'
+      quickNavCode.includes('getScaleXCap'),
+      'liftPill must use getScaleXCap for dynamic horizontal capping'
     );
     assert.ok(
-      quickNavCode.includes('scaleY: reduced ? 1 : 1.06') ||
-        quickNavCode.includes('scaleY: 1.06'),
-      'Lift tween must set scaleY up to 1.06 max to prevent vertical clipping'
+      quickNavCode.includes('scaleX: reduced ? 1 : sx'),
+      'Lift tween must use dynamically capped sx'
+    );
+    assert.ok(
+      quickNavCode.includes('scaleY: reduced ? 1 : LIFT_SCALE_Y'),
+      'Lift tween must set scaleY up to LIFT_SCALE_Y to prevent vertical clipping'
     );
   });
 
@@ -183,34 +185,41 @@ describe('Apple-Style Draggable Pill QuickNav', () => {
   test('STEP 6 - Apple Glass Look: backdrop blur, borders, palette, and highlights', () => {
     // Nav bg layer
     assert.ok(
-      quickNavCode.includes("backdropFilter: 'blur(18px) saturate(160%)'"),
-      'Container must have backdrop-filter: blur(18px) saturate(160%)'
+      quickNavCode.includes("backdropFilter: 'blur(6px) saturate(100%)'"),
+      'Container must have backdrop-filter: blur(6px) saturate(100%)'
     );
     assert.ok(
-      quickNavCode.includes("WebkitBackdropFilter: 'blur(18px) saturate(160%)'"),
+      quickNavCode.includes("WebkitBackdropFilter: 'blur(6px) saturate(100%)'"),
       'Container must have -webkit-backdrop-filter'
     );
     assert.ok(
-      quickNavCode.includes('rgba(2, 26, 84, 0.45)'),
-      'Container must have rgba(2, 26, 84, 0.45) bg'
+      quickNavCode.includes('rgba(2, 26, 84, 0.2)'),
+      'Container must have rgba(2, 26, 84, 0.2) bg'
     );
     assert.ok(
       quickNavCode.includes('rgba(255, 255, 255, 0.12)'),
       'Container must have 1px border rgba(255, 255, 255, 0.12)'
     );
 
-    // Pill glass styling
+    // Pill glass styling: gradient background and inset-only highlight
     assert.ok(
-      quickNavCode.includes('rgba(255, 133, 187, 0.25)'),
-      'Pill must have pink tint rgba(255, 133, 187, 0.25)'
+      quickNavCode.includes('linear-gradient') &&
+        quickNavCode.includes('rgba(255, 133, 187, 0.28)'),
+      'Pill must have gradient background'
     );
     assert.ok(
-      quickNavCode.includes('rgba(255, 255, 255, 0.35)'),
-      'Pill must have inset 1px highlight rgba(255, 255, 255, 0.35)'
+      quickNavCode.includes('PILL_SHADOW_REST') ||
+        quickNavCode.includes('inset 0 1px 0 rgba(255, 255, 255, 0.35)'),
+      'Pill must have inset-only highlight'
     );
+
+    // Pill has NO backdropFilter (prevents rectangular halo leak on WebKit)
+    const pillElementMatch = quickNavCode.match(/ref=\{pillRef\}[\s\S]*?\/>/);
+    assert.ok(pillElementMatch, 'Must find pill element');
     assert.ok(
-      quickNavCode.includes('blur(8px)'),
-      'Pill must have blur inside'
+      !pillElementMatch[0].includes('backdropFilter') &&
+        !pillElementMatch[0].includes('BackdropFilter'),
+      'Pill must NOT have backdropFilter'
     );
 
     // Label colors

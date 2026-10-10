@@ -498,9 +498,11 @@ function QuickNav({ messages, onOpenSettings }) {
     const pill = pillRef.current;
     if (!pill) return;
     const reduced = isReducedMotion();
+    const width = dragStateRef.current.currentPillWidth || pill.offsetWidth;
+    const sx = Math.min(1.06, getScaleXCap(width));
     gsap.to(pill, {
-      scaleX: reduced ? 1 : 1.10,
-      scaleY: reduced ? 1 : 1.06,
+      scaleX: reduced ? 1 : sx,
+      scaleY: reduced ? 1 : LIFT_SCALE_Y,
       boxShadow: PILL_SHADOW_LIFT,
       filter: 'brightness(1.12)',
       duration: 0.15,
@@ -934,7 +936,8 @@ function QuickNav({ messages, onOpenSettings }) {
             className="relative flex items-center gap-0.5 overflow-x-auto overflow-y-hidden no-scrollbar min-w-0 flex-1 touch-pan-y px-1"
             style={{ overscrollBehaviorX: 'none' }}
           >
-            {/* Draggable glass pill */}
+            {/* Draggable glass pill. Inset shadows only, no backdrop-filter:
+                both caused rectangle leak / glow outside nav. */}
             <div
               ref={pillRef}
               aria-hidden="true"
@@ -949,10 +952,9 @@ function QuickNav({ messages, onOpenSettings }) {
                 zIndex: 1,
                 touchAction: 'none',
                 transformOrigin: '50% 50%',
-                background: 'rgba(255, 133, 187, 0.25)',
-                boxShadow: 'inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 0 -7px 12px -6px rgba(255, 133, 187, 0.30)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
+                background:
+                  'linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 133, 187, 0.28) 100%)',
+                boxShadow: PILL_SHADOW_REST,
                 border: '1px solid rgba(255, 255, 255, 0.16)',
               }}
             />

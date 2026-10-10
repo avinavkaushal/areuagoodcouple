@@ -891,9 +891,9 @@ function QuickNav({ messages, onOpenSettings }) {
             className="nav-bg absolute inset-0 rounded-full pointer-events-none"
             style={{
               zIndex: 0,
-              background: 'rgba(2, 26, 84, 0.45)',
-              backdropFilter: 'blur(18px) saturate(160%)',
-              WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+              background: 'rgba(2, 26, 84, 0.2)',
+              backdropFilter: 'blur(6px) saturate(100%)',
+              WebkitBackdropFilter: 'blur(6px) saturate(100%)',
               border: '1px solid rgba(255, 255, 255, 0.12)',
               boxShadow:
                 '0 16px 40px -8px rgba(0, 2, 14, 0.75), inset 0 1px 0 rgba(255, 255, 255, 0.20)',

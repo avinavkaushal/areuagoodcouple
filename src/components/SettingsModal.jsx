@@ -33,20 +33,31 @@ function SettingsModal({
     pointerId: null,
   });
 
-  useEffect(() => {
+  // Reset the form only when the sheet opens or the underlying names really change.
+  // (currentMapping is a fresh object every App render, so it must not be a dependency.)
+  const herCurrent = currentMapping?.her;
+  const himCurrent = currentMapping?.him;
+  const syncKey = isOpen ? `${herCurrent}\u0000${himCurrent}\u0000${(rawSenders || []).join('\u0001')}` : null;
+  const [lastSyncKey, setLastSyncKey] = useState(syncKey);
+  if (syncKey !== lastSyncKey) {
+    setLastSyncKey(syncKey);
     if (isOpen) {
-      if (closeTimeoutRef.current) {
-        clearTimeout(closeTimeoutRef.current);
-        closeTimeoutRef.current = null;
-      }
       setIsClosing(false);
-      setHerSender(currentMapping?.her || rawSenders?.[0] || 'Her');
-      setHimSender(currentMapping?.him || rawSenders?.[1] || 'Him');
-      if (sheetRef.current) {
-        gsap.set(sheetRef.current, { y: 0, opacity: 1 });
-      }
+      setHerSender(herCurrent || rawSenders?.[0] || 'Her');
+      setHimSender(himCurrent || rawSenders?.[1] || 'Him');
     }
-  }, [isOpen, currentMapping, rawSenders]);
+  }
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (closeTimeoutRef.current) {
+      clearTimeout(closeTimeoutRef.current);
+      closeTimeoutRef.current = null;
+    }
+    if (sheetRef.current) {
+      gsap.set(sheetRef.current, { y: 0, opacity: 1 });
+    }
+  }, [isOpen]);
 
   const closeWithAnimation = useCallback(
     (callback) => {
@@ -216,6 +227,7 @@ function SettingsModal({
     onSaveMapping({
       her: herSender,
       him: himSender,
+      prevHer: currentMapping?.her,
       mapping: {
         [herSender]: 'Her',
         [himSender]: 'Him',

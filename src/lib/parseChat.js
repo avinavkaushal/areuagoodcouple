@@ -18,10 +18,24 @@ const WA_LINE_RE = /^\[?(\d{1,2})[/.-](\d{1,2})[/.-](\d{2,4}),?\s+(\d{1,2}):(\d{
 const WA_HEADER_ONLY_RE = /^\[?\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\s*[apAP]\.?\s*[mM]\.?)?(?:\]|\s+-)\s+/;
 const WA_MEDIA_RE = /^(?:<(?:media|image|video|audio|gif|document)\s+omitted>|(?:image|video|audio|gif|document|contact card|video note) omitted|<attached:[^>]*>|.*\(file attached\))$/i;
 
+// Some locales export ISO dates ("2023-05-12, 10:00 - Name: hi"). Rewrite to d/m/yyyy so one regex handles all.
+function normalizeIsoPrefix(line) {
+  return line.replace(
+    /^(\[?)(\d{4})[/.-](\d{1,2})[/.-](\d{1,2})(?=,?\s)/,
+    (_, br, y, mo, d) => `${br}${d}/${mo}/${y}`
+  );
+}
+
+// "You created group "Foo: bar"" matches the "Name: text" regex with a bogus sender. Real names never look like this.
+function isLikelySystemSender(name) {
+  return /["“”]|\b(?:created group|changed the (?:subject|group)|changed this group|changed their phone number|security code|was added|were added|added you|joined using)\b/i.test(name);
+}
+
 function detectDateOrder(lines) {
   let dmy = 0;
   let mdy = 0;
-  for (const l of lines) {
+  for (const raw of lines) {
+    const l = raw.replace(/[\uFEFF\u200E\u200F\u202A-\u202E]/g, '');
     const m = l.match(/^\[?(\d{1,2})[/.-](\d{1,2})[/.-]\d{2,4}/);
     if (!m) continue;
     if (+m[1] > 12) dmy++;
@@ -216,10 +230,10 @@ export function parseTelegramJson(json, nicknameMap = {}) {
     } else if (m.date) {
       timestamp = new Date(m.date);
     } else {
-      timestamp = new Date();
+      timestamp = new Date(NaN);
     }
     if (isNaN(timestamp.getTime())) {
-      timestamp = new Date();
+      timestamp = new Date(NaN); // filled from neighbours after the loop
     }
 
     // Determine meta
@@ -233,9 +247,10 @@ export function parseTelegramJson(json, nicknameMap = {}) {
         const emoji = r.emoji;
         if (Array.isArray(r.recent) && r.recent.length > 0) {
           for (const recent of r.recent) {
+            const actorRaw = recent.from ? String(recent.from).trim() : '';
             list.push({
               emoji,
-              ...(recent.from ? { sender: nicknameMap[recent.from] || recent.from } : {}),
+              ...(actorRaw ? { sender: nicknameMap[actorRaw] || actorRaw, _rawActor: actorRaw } : {}),
             });
           }
         } else if (emoji) {
@@ -271,6 +286,19 @@ export function parseTelegramJson(json, nicknameMap = {}) {
     });
 
     messages.push(message);
+  }
+
+  // Messages with a missing/invalid date inherit the previous valid time (was: "now", which wrecked every date stat)
+  if (messages.length > 0) {
+    const firstValid = messages.find((m) => !isNaN(m.timestamp.getTime()));
+    if (!firstValid) {
+      throw new Error('Invalid Telegram export: no message has a valid date.');
+    }
+    let lastGood = firstValid.timestamp;
+    for (const msg of messages) {
+      if (isNaN(msg.timestamp.getTime())) msg.timestamp = new Date(lastGood.getTime());
+      else lastGood = msg.timestamp;
+    }
   }
 
   // Determine mapped senders list (preserving 2 participants)
@@ -312,11 +340,11 @@ export function parseWhatsApp(text, nicknameMap = {}) {
   const messages = [];
   const rawSenderSet = new Set();
   let lastWasDeleted = false;
-  const order = detectDateOrder(lines.slice(0, 2000));
+  const order = detectDateOrder(lines);
 
   for (const rawLine of lines) {
     // Strip invisible unicode directional formatting characters and BOM
-    const line = rawLine.replace(/[\uFEFF\u200E\u200F\u202A-\u202E]/g, '');
+    const line = normalizeIsoPrefix(rawLine.replace(/[\uFEFF\u200E\u200F\u202A-\u202E]/g, ''));
     const code = line.charCodeAt(0);
     // Fast-path: header must start with '[' (ASCII 91) or digit '0'-'9' (ASCII 48-57)
     const match = (code === 91 || (code >= 48 && code <= 57)) ? line.match(WA_LINE_RE) : null;
@@ -324,6 +352,11 @@ export function parseWhatsApp(text, nicknameMap = {}) {
     if (match) {
       const [, day, month, year, hour, min, sec, ampm, senderRaw, msg] = match;
       const rawSender = senderRaw.trim();
+      if (isLikelySystemSender(rawSender)) {
+        // system event with a colon inside its text: not a person, do not glue onto previous message
+        lastWasDeleted = true;
+        continue;
+      }
       const date = parseDateTime(day, month, year, hour, min, sec, ampm, order);
 
       if (rawSender) {
@@ -660,7 +693,9 @@ export function parseInstagramJson(jsonOrArray, nicknameMap = {}) {
       continue;
     }
 
-    const ts = Number(m.timestamp_ms) || 0;
+    const ts = Number(m.timestamp_ms);
+    // no usable timestamp: cannot place it on the timeline (used to land in 1970)
+    if (!Number.isFinite(ts) || ts <= 0) continue;
     const shareLink = m.share?.link || '';
     const dedupeKey = `${rawSender}|${ts}|${decodedContent || ''}|${shareLink}`;
     if (seenKeys.has(dedupeKey)) {
@@ -805,7 +840,7 @@ export function detectPlatform(text, fileName = '') {
   // WhatsApp detection: check first 100 lines for WhatsApp export patterns
   const lines = trimmed.split(/\r?\n/).slice(0, 100);
   for (const rawLine of lines) {
-    const line = rawLine.replace(/[\u200E\u200F\u202A-\u202E]/g, '');
+    const line = normalizeIsoPrefix(rawLine.replace(/[\u200E\u200F\u202A-\u202E]/g, ''));
     const code = line.charCodeAt(0);
     if ((code === 91 || (code >= 48 && code <= 57)) && WA_LINE_RE.test(line)) {
       return { platform: 'whatsapp' };
@@ -825,6 +860,54 @@ async function readFileText(file) {
     reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsText(file);
   });
+}
+
+/**
+ * Merge several parsed exports of the SAME platform (e.g. two WhatsApp .txt files
+ * covering different date ranges). Sorted by time. Overlap between files is
+ * dropped, but repeated identical messages inside one file are kept.
+ */
+function mergeParsedChats(parsedList, platform) {
+  const counts = new Map();
+  const merged = [];
+
+  for (const p of parsedList) {
+    const local = new Map();
+    for (const m of p.messages) {
+      const key = `${m._rawSender || m.sender}|${m.timestamp.getTime()}|${m.text}`;
+      const n = (local.get(key) || 0) + 1;
+      local.set(key, n);
+      if (n > (counts.get(key) || 0)) merged.push(m);
+    }
+    for (const [key, n] of local) {
+      counts.set(key, Math.max(counts.get(key) || 0, n));
+    }
+  }
+
+  merged.sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime() || 0);
+
+  const seenIds = new Set();
+  merged.forEach((m, i) => {
+    let id = m.id;
+    if (platform === 'whatsapp' || seenIds.has(id)) id = `${platform === 'whatsapp' ? 'wa' : m.id}-${i}`;
+    while (seenIds.has(id)) id = `${id}_`;
+    seenIds.add(id);
+    m.id = id;
+  });
+
+  const rawSenders = [...new Set(parsedList.flatMap((p) => p.rawSenders))];
+  const senders = [...new Set(parsedList.flatMap((p) => p.senders))];
+  return { platform, messages: merged, senders, rawSenders };
+}
+
+function parseWhatsAppItems(items, nicknameMap) {
+  const parsed = items.map((it) => parseWhatsApp(it.text, nicknameMap));
+  return parsed.length === 1 ? parsed[0] : mergeParsedChats(parsed, 'whatsapp');
+}
+
+function parseTelegramItems(items, nicknameMap) {
+  const parsed = items.map((it) => parseTelegramJson(it.detection?.data || it.text, nicknameMap));
+  return parsed.length === 1 ? parsed[0] : mergeParsedChats(parsed, 'telegram');
 }
 
 /**
@@ -879,22 +962,22 @@ export async function parseChatFiles(files, nicknameMap = {}) {
 
   // If only Telegram files
   if (detectedPlatformNames.length === 1 && detectedPlatformNames[0] === 'telegram') {
-    return parseTelegramJson(telegramItems[0].detection?.data || telegramItems[0].text, nicknameMap);
+    return parseTelegramItems(telegramItems, nicknameMap);
   }
 
   // If only WhatsApp files
   if (detectedPlatformNames.length === 1 && detectedPlatformNames[0] === 'whatsapp') {
-    return parseWhatsApp(whatsappItems[0].text, nicknameMap);
+    return parseWhatsAppItems(whatsappItems, nicknameMap);
   }
 
   // If mixed platforms were dropped together
   if (detectedPlatformNames.length > 1) {
     const platforms = [];
     if (whatsappItems.length > 0) {
-      platforms.push(parseWhatsApp(whatsappItems[0].text, nicknameMap));
+      platforms.push(parseWhatsAppItems(whatsappItems, nicknameMap));
     }
     if (telegramItems.length > 0) {
-      platforms.push(parseTelegramJson(telegramItems[0].detection?.data || telegramItems[0].text, nicknameMap));
+      platforms.push(parseTelegramItems(telegramItems, nicknameMap));
     }
     if (instagramPayloads.length > 0) {
       platforms.push(parseInstagramJson(instagramPayloads, nicknameMap));

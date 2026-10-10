@@ -3,16 +3,25 @@ import gsap from 'gsap';
 import { getKeywordStats } from '../lib/stats';
 import CountUp from './CountUp';
 
+const queryKeyOf = (keyword, wholeWord) => (keyword ? `${keyword}\u0000${wholeWord ? 1 : 0}` : '');
+
 function KeywordSearch({ messages }) {
   const [keyword, setKeyword] = useState('');
   const [debouncedKeyword, setDebouncedKeyword] = useState('');
   const [wholeWord, setWholeWord] = useState(false);
-  const [isSearching, setIsSearching] = useState(false);
-  const [stats, setStats] = useState(null);
+  // result answers one specific query (key); spinner + visible stats are derived from it
+  const [result, setResult] = useState({ key: '', stats: null });
 
   const resultRef = useRef(null);
   const workerRef = useRef(null);
   const searchIdRef = useRef(0);
+  const searchKeyRef = useRef('');
+
+  const trimmedKeyword = keyword.trim();
+  const isSearching =
+    Boolean(trimmedKeyword) &&
+    (trimmedKeyword !== debouncedKeyword || result.key !== queryKeyOf(debouncedKeyword, wholeWord));
+  const stats = trimmedKeyword ? result.stats : null;
 
   const firstDate = messages?.[0]?.timestamp || messages?.[0]?.date;
   const lastDate = messages?.[messages?.length - 1]?.timestamp || messages?.[messages?.length - 1]?.date;
@@ -40,11 +49,14 @@ function KeywordSearch({ messages }) {
       worker.postMessage({ type: 'INIT', payload: initPayload });
 
       worker.onmessage = (e) => {
-        const { type, searchId, result } = e.data;
+        const { type, searchId, result: found } = e.data;
         if (type === 'SEARCH_RESULT' && searchId === searchIdRef.current) {
-          setStats(result);
-          setIsSearching(false);
+          setResult({ key: searchKeyRef.current, stats: found });
         }
+      };
+      // a crashed search must never leave the spinner running
+      worker.onerror = () => {
+        setResult({ key: searchKeyRef.current, stats: null });
       };
 
       return () => {
@@ -62,10 +74,6 @@ function KeywordSearch({ messages }) {
     setKeyword(val);
     if (!val.trim()) {
       setDebouncedKeyword('');
-      setStats(null);
-      setIsSearching(false);
-    } else {
-      setIsSearching(true);
     }
   };
 
@@ -83,21 +91,29 @@ function KeywordSearch({ messages }) {
 
   // Execute search via Web Worker (or fallback)
   useEffect(() => {
-    if (!debouncedKeyword) return;
+    if (!debouncedKeyword) return undefined;
 
+    const key = queryKeyOf(debouncedKeyword, wholeWord);
     const nextId = ++searchIdRef.current;
-    setIsSearching(true);
+    searchKeyRef.current = key;
 
     if (workerRef.current) {
       workerRef.current.postMessage({
         type: 'SEARCH',
         payload: { searchId: nextId, keyword: debouncedKeyword, wholeWord },
       });
-    } else {
-      const res = getKeywordStats(messages, debouncedKeyword, { wholeWord });
-      setStats(res);
-      setIsSearching(false);
+      return undefined;
     }
+
+    // no worker: compute off the effect body so state is never set synchronously
+    const timer = setTimeout(() => {
+      try {
+        setResult({ key, stats: getKeywordStats(messages, debouncedKeyword, { wholeWord }) });
+      } catch {
+        setResult({ key, stats: null });
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [debouncedKeyword, wholeWord, messages]);
 
   // Animate result apparition

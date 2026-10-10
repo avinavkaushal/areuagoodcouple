@@ -147,3 +147,50 @@ export function resolveSenderMapping(rawSenders = [], storedConfig = getStoredNi
     mapping: { [s1]: 'Her', [s2]: 'Him' },
   };
 }
+
+/**
+ * Build raw-name -> 'Her'/'Him' mappings for EVERY loaded platform after the
+ * Settings modal saves. Settings only knows the primary platform's raw names,
+ * so other platforms (different handles) follow the same swap decision.
+ *
+ * @param {Record<string, { rawSenders?: string[], messages?: any[] }>} loadedPlatforms
+ * @param {{ her: string, him: string, prevHer?: string }} choice
+ * @returns {{ perPlatform: Record<string, Record<string, string>>, combined: Record<string, string> }}
+ */
+export function buildSettingsMappings(loadedPlatforms = {}, { her, him, prevHer } = {}) {
+  const swapped = Boolean(prevHer) && prevHer !== her;
+  const perPlatform = {};
+  const combined = {};
+
+  for (const [key, entry] of Object.entries(loadedPlatforms || {})) {
+    const raws = entry?.rawSenders || [];
+    let map = {};
+
+    if (her && him && her !== him && raws.includes(her) && raws.includes(him)) {
+      map = { [her]: 'Her', [him]: 'Him' };
+    } else {
+      const labels = {};
+      for (const m of entry?.messages || []) {
+        const raw = m._rawSender || m.sender;
+        if (raws.includes(raw) && labels[raw] === undefined && (m.sender === 'Her' || m.sender === 'Him')) {
+          labels[raw] = m.sender;
+          if (Object.keys(labels).length === raws.length) break;
+        }
+      }
+      for (const raw of raws) {
+        const cur = labels[raw];
+        if (!cur) continue;
+        map[raw] = swapped ? (cur === 'Her' ? 'Him' : 'Her') : cur;
+      }
+    }
+
+    perPlatform[key] = map;
+    Object.assign(combined, map);
+  }
+
+  if (her && him && her !== him) {
+    combined[her] = 'Her';
+    combined[him] = 'Him';
+  }
+  return { perPlatform, combined };
+}

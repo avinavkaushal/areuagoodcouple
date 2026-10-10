@@ -117,6 +117,10 @@ export function getEmojiComparison(messages, senders) {
   return { order, rows, maxVal };
 }
 
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 export function getKeywordStats(messages, keyword, options = {}) {
   const wholeWord = typeof options === 'boolean' ? options : Boolean(options?.wholeWord);
   const kw = (keyword || '').trim().toLowerCase();
@@ -124,7 +128,7 @@ export function getKeywordStats(messages, keyword, options = {}) {
   if (!kw || validMessages.length === 0) return null;
 
   const kwRe = wholeWord
-    ? new RegExp(`(?<![\\p{L}\\p{N}])${kw.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu')
+    ? new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(kw)}(?![\\p{L}\\p{N}])`, 'iu')
     : null;
 
   const hourCounts = new Array(24).fill(0);
@@ -605,7 +609,7 @@ export function getResponseTimeStats(messages, senders) {
       replyCount: data[p2].count,
     },
     order: [p1, p2],
-    fasterSender: p1Avg > 0 && p2Avg > 0 ? (p1Avg <= p2Avg ? p1 : p2) : (p1Avg > 0 ? p1 : p2),
+    fasterSender: p1Avg > 0 && p2Avg > 0 ? (p1Avg <= p2Avg ? p1 : p2) : p1Avg > 0 ? p1 : p2Avg > 0 ? p2 : null,
   };
 }
 
@@ -709,8 +713,8 @@ export function getLoveWordStats(messages, senders) {
 
   const topWord = leaderboard[0] || null;
   const loveComparison = wordCounts['love'] || { [p1]: 0, [p2]: 0, total: 0 };
-  const whoSaysLoveMore = loveComparison[p1] >= loveComparison[p2] ? p1 : p2;
-  const whoSaysMoreOverall = totals[p1] >= totals[p2] ? p1 : p2;
+  const whoSaysLoveMore = loveComparison[p1] === loveComparison[p2] ? null : loveComparison[p1] > loveComparison[p2] ? p1 : p2;
+  const whoSaysMoreOverall = totals[p1] === totals[p2] ? null : totals[p1] > totals[p2] ? p1 : p2;
 
   const monthlyTrend = Object.entries(monthlyCounts)
     .sort((a, b) => a[0].localeCompare(b[0]))
@@ -849,8 +853,8 @@ export function getCalloutStats(messages, senders) {
     }
   }
 
-  const morningLeader = morningCounts[p1] >= morningCounts[p2] ? p1 : p2;
-  const nightLeader = nightCounts[p1] >= nightCounts[p2] ? p1 : p2;
+  const morningLeader = morningCounts[p1] === morningCounts[p2] ? null : morningCounts[p1] > morningCounts[p2] ? p1 : p2;
+  const nightLeader = nightCounts[p1] === nightCounts[p2] ? null : nightCounts[p1] > nightCounts[p2] ? p1 : p2;
 
   const longestMorningStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, MORNING_RE));
   const longestNightStreak = getLongestStreak(validMessages, (m) => matchesAnyPhrase(m.text, NIGHT_RE));

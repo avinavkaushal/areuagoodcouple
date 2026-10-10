@@ -157,7 +157,7 @@ describe('Telegram JSON Parsing', () => {
     assert.equal(msg2.type, 'text');
     assert.ok(msg2.timestamp instanceof Date);
     assert.equal(msg2.date.getTime(), msg2.timestamp.getTime());
-    assert.deepEqual(msg2.meta.reactions, [{ emoji: '❤️', sender: 'Him' }]);
+    assert.deepEqual(msg2.meta.reactions, [{ emoji: '❤️', sender: 'Him', _rawActor: 'Bob' }]);
     assert.equal(msg2.meta.isReply, undefined);
 
     // Message 3: Array text message, reply and forward

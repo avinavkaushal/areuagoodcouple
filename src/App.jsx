@@ -6,6 +6,7 @@ import {
   getStoredNicknameConfig,
   saveStoredNicknameConfig,
   resolveSenderMapping,
+  buildSettingsMappings,
 } from './lib/nicknameConfig';
 import QuickNav from './components/QuickNav';
 import Hero from './components/Hero';
@@ -216,8 +217,10 @@ function App() {
       // Resolve initial Her/Him mapping
       const resolved = resolveSenderMapping(detectedRawSenders, storedConfig);
 
+      const platformLabel =
+        parsed.platform === 'instagram' ? 'Instagram' : parsed.platform === 'telegram' ? 'Telegram' : 'WhatsApp';
       const displayName =
-        files.length > 1 ? `${files.length} Instagram export files` : files[0].name;
+        files.length > 1 ? `${files.length} ${platformLabel} export files` : files[0].name;
 
       setPendingChat({
         platform: parsed.platform,
@@ -249,12 +252,30 @@ function App() {
           ? await parseChatFiles(files, storedConfig.mapping || {})
           : await parseChatFile(files[0], storedConfig.mapping || {});
 
+      if (parsed.multiPlatform) {
+        alert('Please add one platform at a time (WhatsApp, Telegram or Instagram).');
+        return;
+      }
+
+      if (!parsed.messages || parsed.messages.length === 0) {
+        alert('No chat messages could be parsed. Please make sure this is a valid WhatsApp, Telegram, or Instagram export.');
+        return;
+      }
+
       const detectedRawSenders = parsed.rawSenders || [];
       if (detectedRawSenders.length !== 2) {
         alert(
           `This tool works with 2-person chats only. Found ${detectedRawSenders.length} participant(s).`
         );
         return;
+      }
+
+      if (loadedPlatforms[parsed.platform]) {
+        const label =
+          parsed.platform === 'instagram' ? 'Instagram' : parsed.platform === 'telegram' ? 'Telegram' : 'WhatsApp';
+        if (!window.confirm(`${label} is already linked. Replace it with this export?`)) {
+          return;
+        }
       }
 
       const resolved = resolveSenderMapping(detectedRawSenders, storedConfig);
@@ -508,18 +529,16 @@ function App() {
   };
 
   const handleRemovePlatform = (platformKey) => {
-    setLoadedPlatforms((prev) => {
-      const next = { ...prev };
-      delete next[platformKey];
-      const remainingKeys = Object.keys(next);
-      if (remainingKeys.length === 0) {
-        handleResetChat();
-      } else {
-        setPlatform(remainingKeys[0]);
-        setRawSenders(next[remainingKeys[0]].rawSenders);
-      }
-      return next;
-    });
+    const next = { ...loadedPlatforms };
+    delete next[platformKey];
+    const remainingKeys = Object.keys(next);
+    if (remainingKeys.length === 0) {
+      handleResetChat();
+      return;
+    }
+    setLoadedPlatforms(next);
+    setPlatform(remainingKeys[0]);
+    setRawSenders(next[remainingKeys[0]].rawSenders);
   };
 
   const handleResetChat = () => {
@@ -534,22 +553,25 @@ function App() {
   };
 
   // Re-map messages when settings are modified inside dashboard
-  const handleSaveSettingsMapping = ({ mapping }) => {
-    saveStoredNicknameConfig({ mapping });
+  const handleSaveSettingsMapping = ({ her, him, prevHer, mapping }) => {
+    const { perPlatform, combined } = buildSettingsMappings(loadedPlatforms, { her, him, prevHer });
+    const currentConfig = getStoredNicknameConfig();
+    const fullMapping = { ...(currentConfig.mapping || {}), ...(mapping || {}), ...combined };
+    saveStoredNicknameConfig({ ...currentConfig, mapping: fullMapping });
+
     setLoadedPlatforms((prev) => {
       const next = {};
       for (const key of Object.keys(prev)) {
         const item = prev[key];
         next[key] = {
           ...item,
-          messages: applyNicknameMapping(item.messages, mapping),
+          messages: applyNicknameMapping(item.messages, perPlatform[key] || mapping || {}),
         };
       }
       return next;
     });
     if (messages) {
-      const updatedMessages = applyNicknameMapping(messages, mapping);
-      setMessages(updatedMessages);
+      setMessages(applyNicknameMapping(messages, { ...(mapping || {}), ...combined }));
       setSenders(['Her', 'Him']);
     }
   };

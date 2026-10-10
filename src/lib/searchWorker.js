@@ -1,3 +1,7 @@
+function escapeRegExp(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 let messagesData = [];
 
 self.onmessage = (e) => {
@@ -39,7 +43,7 @@ self.onmessage = (e) => {
     }
 
     const kwRe = wholeWord
-      ? new RegExp(`(?<![\\p{L}\\p{N}])${kw.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu')
+      ? new RegExp(`(?<![\\p{L}\\p{N}])${escapeRegExp(kw)}(?![\\p{L}\\p{N}])`, 'iu')
       : null;
 
     const hourCounts = new Array(24).fill(0);

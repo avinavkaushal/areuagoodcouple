@@ -49,7 +49,7 @@ function ResponseTime({ messages, senders }) {
         </p>
 
         <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight font-semibold mb-8 sm:mb-12">
-          {stats.fasterSender} is the quicker texter.
+          {stats.fasterSender ? `${stats.fasterSender} is the quicker texter.` : 'not enough replies to compare yet.'}
         </h2>
 
         {/* Side-by-side comparison card */}

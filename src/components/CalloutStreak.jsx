@@ -64,7 +64,7 @@ function CalloutStreak({ messages, senders }) {
 
             <div className="pt-4 border-t border-glass-divider text-xs font-sans text-cloud/70 space-y-1">
               <div>
-                Leading sender: <strong className="text-pink font-semibold">{stats.morning.leader}</strong>
+                Leading sender: <strong className="text-pink font-semibold">{stats.morning.leader ?? (stats.morning.counts.total === 0 ? '—' : 'tied')}</strong>
               </div>
               <div className="text-cloud/50 font-mono text-[11px]">
                 {p1}: {stats.morning.counts[p1]} · {p2}: {stats.morning.counts[p2]}
@@ -89,7 +89,7 @@ function CalloutStreak({ messages, senders }) {
 
             <div className="pt-4 border-t border-glass-divider text-xs font-sans text-cloud/70 space-y-1">
               <div>
-                Leading sender: <strong className="text-pink font-semibold">{stats.night.leader}</strong>
+                Leading sender: <strong className="text-pink font-semibold">{stats.night.leader ?? (stats.night.counts.total === 0 ? '—' : 'tied')}</strong>
               </div>
               <div className="text-cloud/50 font-mono text-[11px]">
                 {p1}: {stats.night.counts[p1]} · {p2}: {stats.night.counts[p2]}

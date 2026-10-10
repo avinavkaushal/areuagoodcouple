@@ -45,7 +45,11 @@ function LoveWords({ messages, senders }) {
         </p>
 
         <h2 data-reveal="2" className="font-serif text-cloud text-3xl sm:text-5xl leading-tight font-semibold mb-8 sm:mb-12">
-          {stats.whoSaysMoreOverall} reaches for sweet words most.
+          {stats.whoSaysMoreOverall
+            ? `${stats.whoSaysMoreOverall} reaches for sweet words most.`
+            : stats.totals.overall === 0
+            ? 'no sweet words in this chat yet.'
+            : 'you both reach for sweet words equally.'}
         </h2>
 
         {/* Summary Card */}
